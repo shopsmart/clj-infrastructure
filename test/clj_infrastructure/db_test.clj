@@ -28,7 +28,7 @@
 ;;                :timeout-seconds 900}
 ;; }
 ;;
-;; Then you can set (def current-deb :redshift) below
+;; Then you can set (def current-db :redshift) below
 
 (defconfig secrets "REDSHIFT_SECRETS" "local-postgres.edn")
 
