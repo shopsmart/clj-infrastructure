@@ -1,10 +1,9 @@
 # clj-infrastructure
 
-Infrastructure utilities used at ShopSmart/Brad's Deals.
-
 * Relational databases
-  * Configuration assistance for all JDBC levels as well as the db library itself.
+  * Configuration assistance
   * Interact with a PreparedStatement as a regular Clojure function
+  * defstatement / defquery
 
 * AWS (future)
   * Get the current user's access keys
