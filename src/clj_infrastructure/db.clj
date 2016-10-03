@@ -257,7 +257,7 @@
   [e :- Throwable]
   (let [msg                      (d/replace-nil (.getMessage e) "")
         fatal-exception-messages (dbconfig {} :fatal-exceptions)]
-    (reduce (fn [fatal msg-substring] (if (.contains msg msg-substring) (reduced true))) false fatal-exception-messages)))
+    (reduce (fn [fatal msg-substring] (if (str/includes? msg msg-substring) (reduced true))) false fatal-exception-messages)))
 
 
 (s/defn any-fatal-exceptions? :- s/Bool

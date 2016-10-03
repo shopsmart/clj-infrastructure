@@ -4,7 +4,8 @@
             [clojure.string :as str]
             [schema.core :as s :refer [=> =>*]]
             [clj-foundation.unit-test-common :as common]
-            [clj-foundation.patterns :as p :refer [def-singleton-fn f]]
+            [clj-foundation.patterns :as p :refer [def-singleton-fn f letfn-map]]
+            [clj-foundation.errors :as err :refer [try*]]
             [clj-foundation.millis :as millis]
             [clj-foundation.templates :as template]
             [clj-foundation.config :refer [defconfig]]
@@ -135,6 +136,134 @@
                                  :where-val "'Moo'")))))))
 
 
+;; execute-forall testing ===============================================================================
+
+
+
+(defn query'
+  "Always happy!"
+  [& substitutions]
+  [{:first-name "John" :last-name "Doe"}
+   {:first-name "Jane" :last-name "Doe"}])
+
+
+(defn query''
+  "Can't query nothing; else we're happy!"
+  [& substitutions]
+  (when (= (second substitutions) "nothing")
+    (let [sql "select * from ${table};"]
+      (throw (IllegalStateException. (apply template/subst<- sql substitutions)))))
+
+  [{:first-name "John" :last-name "Doe"}
+   {:first-name "Jane" :last-name "Doe"}])
+
+
+(defn query'''
+  "Always unhappy :-(  Stop. Right. Now!"
+  [& substitutions]
+  (throw (IllegalStateException. "halt")))
+
+
+;; One function to rule all the query executors
+
+(defn execute-forall [query]
+  "Execute a forall-substitutions loop for a specified query executor function and dummy data."
+  (forall-substitutions
+
+   ;; A function that accepts substitution variables, queries/executes a statement, and returns results.
+   query
+
+   ;; Starting synopsis
+   {:call-count 0
+    :errors []
+    :tables []}
+
+   ;; Callbacks
+   (letfn-map
+    [(on-success [current-result query-result substitutions]
+                 (-> current-result
+                     (update-in [:call-count] inc)
+                     (update-in [:tables] #(conj % (:table substitutions)))))
+
+     (on-failure [current-result exception substitutions]
+                 (let [next-result (-> current-result
+                                       (update-in [:call-count] inc)
+                                       (update-in [:errors] #(conj % exception)))]
+
+                   (if (= "halt" (.getMessage exception))
+                     (throw (ex-info "Halting!" next-result exception))
+                     next-result)))])
+
+   ;; substitution values
+   [:table "nothing"]
+   [:table "nowhere"]
+   [:table "nobody"]))
+
+
+
+(deftest forall-substitutions-test
+  (testing "forall-substitutions calls the same query executor multiple times with different substitution variables each time"
+
+    (testing "Successful queries call the success function and populate the results map."
+      (let [job-results (execute-forall query')]
+        (is (= 3 (:call-count job-results)))
+        (is (empty? (:errors job-results)))
+        (is (= ["nothing" "nowhere" "nobody"] (:tables job-results)))))
+
+    (testing "A mixture of successes/failures call the correct functions and populate the results map."
+      (let [job-results (execute-forall query'')]
+        (is (= 3 (:call-count job-results)))
+        (is (= 1 (count (:errors job-results))))
+        (is (= "select * from nothing;" (.getMessage (first (:errors job-results)))))
+        (is (= ["nowhere" "nobody"] (:tables job-results)))))
+
+    (testing "Throwing an exception from error-fn halts processing.  This particular exception contains the job state."
+      (let [job-results (try* (execute-forall query'''))]
+        (is (ex-data job-results))
+
+        (when-let [state (ex-data job-results)]
+          (is (= 1 (:call-count state)))
+          (is (= 1 (count (:errors state))))
+          (is (instance? IllegalStateException (first (:errors state))))
+          (is (empty? (:tables state))))))))
+
+
+;; any-fatal-exceptions? ===============================================================================
+
+
+(let [e1    (Exception. "Just one")
+
+      e2'   (Exception. "I'm guilty.")
+      e2    (Exception. "An exception with a cause." e2')
+
+      e3''  (Exception. "only table or database owner can vacuum it")
+      e3'   (Exception. "Look deeper" e3'')
+      e3    (Exception. "An exception with a fatal cause." e3')
+
+      e4''' (Exception. "Lotssss offff causses, my Preciousss!")
+      e4''  (Exception. "only table or database owner can vacuum it" e4''')
+      e4'   (Exception. "Look deeper" e4'')
+      e4    (Exception. "An exception with a fatal cause." e4')
+
+      e5    (ex-info "Master exception" {} e4)]
+
+  (deftest fatal?-test
+    (testing "(.substring (.getMessage e) ... matching a fatal-exception is fatal"
+      (is (fatal? (Exception. "ERROR: only table or database owner can vacuum it")))
+      (is (not (fatal? (Exception. "Some Random Exception."))))))
+
+
+  (deftest any-fatal-exceptions?-test
+    (testing "True if any exception in exceptions is fatal"
+      (is (not (any-fatal-exceptions? (err/seq<- e1))))
+      (is (not (any-fatal-exceptions? (err/seq<- e2))))
+      (is (any-fatal-exceptions? (err/seq<- e3)))
+      (is (any-fatal-exceptions? (err/seq<- e4)))
+      (is (any-fatal-exceptions? (err/seq<- e5))))))
+
+
+
+;; Transactional tests ==================================================================================
 
 (deftest transaction-behavior
 
