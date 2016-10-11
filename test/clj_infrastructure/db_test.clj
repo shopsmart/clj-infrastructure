@@ -40,33 +40,47 @@
          :password    ""})
 
 
-(def settings {:redshift {:test-table "integration_or_unit_test.transaction_test_777"
-                          :spec (secrets :contentshift)}
-
-               :h2 {:test-table "transaction_test_777"
-                    :spec h2}})
-
-
 ;; Only the transactional tests use this
 (def current-db :h2)
 
+(def settings {:redshift {:test-table "integration_or_unit_test.transaction_test_777"
+                          :test-table-2 "integration_or_unit_test.transaction_test_999"
+                          :spec (secrets :contentshift)}
+
+               :h2 {:test-table "transaction_test_777"
+                    :test-table-2 "transaction_test_999"
+                    :spec h2}})
+
+
 (def test-table (-> settings current-db :test-table))
-(dbconfig-override :test-table test-table)
-(def config (partial dbconfig {DB-SPEC (-> settings current-db :spec)
-                               ABORT?-FN (constantly true)}))
+
+(def config (partial dbconfig {DB-SPEC       (-> settings current-db :spec)
+                         ABORT?-FN     (constantly true)
+                         :test-table   (-> settings current-db :test-table)
+                         :test-table-2 (-> settings current-db :test-table-2)}))
+
+(dbconfig-override :test-table (config :test-table))
 
 (defn q [sql] (template/subst<- sql :test-table test-table))
 
 
-(defn create-test-table [conn]
-  (execute! "drop table if exists ${test-table};" CONNECTION conn)
-  (execute! "create table if not exists ${test-table} (id bigint, description varchar(1000));" CONNECTION conn))
+(defn create-test-table
+  ([conn table-name]
+   (execute! "drop table if exists ${test-table-name};"
+             CONNECTION conn
+             :test-table-name table-name)
+   (execute! "create table if not exists ${test-table-name} (id bigint, description varchar(1000));"
+             CONNECTION conn
+             :test-table-name table-name))
+  ([conn]
+   (create-test-table conn (config :test-table))))
 
 
 ;; Basic database library functionality tests
 
 (defquery find-animal "select ${select-columns} from test_data where ${where-column}=${where-val};"
   ABORT?-FN (constantly true))
+
 
 (deftest database-access
 
@@ -265,7 +279,76 @@
 
 ;; Transactional tests ==================================================================================
 
+(defstatement j-insert "insert into ${table} values ${values}")
+(defstatement j-update "update ${table} set ${values} where ${where}")
+(defquery     j-select "select * from ${table} ${where}" :where "")
+
+
 (deftest transaction-behavior
+
+  (testing "Multiple transactions can write to the same table without killing each other"
+    ;; Setup/initialization
+    (jdbc/with-db-connection [conn (config DB-SPEC)]
+      (create-test-table conn (config :test-table))
+      (j-insert CONNECTION conn
+                   :table (config :test-table)
+                   :values "(10, 'Awwww! What''s up, Doc?'), (20, 'Moo'), (30, 'Oink')")
+
+      (create-test-table conn (config :test-table-2))
+      (j-insert CONNECTION conn
+                   :table (config :test-table-2)
+                   :values "(1, 'Chirp')"))
+
+    (testing "Contending inserts from two transactions"
+      (jdbc/with-db-transaction [trans1 (config DB-SPEC)]
+        (testing "Insert into table1 from trans1"
+          (j-insert CONNECTION trans1
+                       :table (config :test-table)
+                       :values "(40, 'Caaaaw')")
+
+          (testing "Insert into table2 from a new transaction while trans1 is still open"
+            (jdbc/with-db-transaction [trans2 (config DB-SPEC)]
+              (j-insert CONNECTION trans2
+                           :table (config :test-table-2)
+                           :values "(2, 'Aaarf')")))
+
+          (testing "Insert into table2 from initial (longer-running) transaction after trans2 commits"
+            (j-insert CONNECTION trans1
+                         :table (config :test-table-2)
+                         :values "(3, 'Woof')")))))
+
+    (testing "Resolve row-level updates/locks"
+      (let [trans2-future (atom nil)]
+        (jdbc/with-db-transaction [trans1 (config DB-SPEC)]
+          (testing "Update table1 from trans1"
+            (j-update CONNECTION trans1
+                    :table (config :test-table)
+                    :values "description='Bugs Bunny'"
+                    :where "id=10")
+
+            (testing "Update table1 from a new transaction while trans1 is still open"
+              (reset! trans2-future
+                      (future
+                        (jdbc/with-db-transaction [trans2 (config DB-SPEC)]
+                          (j-update CONNECTION trans1
+                                  :table (config :test-table)
+                                  :values "description='Bugs'"
+                                  :where "id=10")))))
+
+            (Thread/sleep 1000)
+
+            (testing "Insert into table2 from initial (longer-running) transaction after trans2 commits"
+              (j-insert CONNECTION trans1
+                           :table (config :test-table-2)
+                           :values "(4, 'Neeeigh')"))))))
+
+    (testing "Ensure row-level updates/locks resolved"
+      (jdbc/with-db-connection [conn (config DB-SPEC)]
+        (is (= "Bugs" (:description
+                       (first
+                        (j-select CONNECTION conn
+                                  :table (config :test-table)
+                                  :where "where id=10"))))))))
 
   (testing "transactions with db.clj library respect exceptions"
     (jdbc/with-db-connection [conn (config DB-SPEC)]
@@ -330,11 +413,11 @@
              (insert-inside :id 30 :sound "Oink")
              (execute! "rollback" CONNECTION trans))))
 
-      (testing "Inserts outside the transaction succeeded."
-        (is (seq (query "select * from ${test-table} where id < 10" CONNECTION conn))))
+       (testing "Inserts outside the transaction succeeded."
+         (is (seq (query "select * from ${test-table} where id < 10" CONNECTION conn))))
 
-      (testing "The failed transaction's inserts rolled back."
-        (is (not (seq (query "select * from ${test-table} where id >= 10" CONNECTION conn))))))))
+       (testing "The failed transaction's inserts rolled back."
+         (is (not (seq (query "select * from ${test-table} where id >= 10" CONNECTION conn))))))))
 
 
   (testing "Validate (.setAutoCommit conn false) doesn't respect autocommit=false in db-do-commands."
