@@ -175,6 +175,7 @@
 
   (->> kvs
        (partition 2)
+       (into (vec @dbconfig-overrides))
        (reduce
         (fn [result [k v]]
           (let [setting-namespace (db-setting? k)]
