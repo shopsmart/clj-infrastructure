@@ -285,10 +285,9 @@
   [sql-or-resource & default-substitutions]
 
   (let [source-sql    (if (.endsWith (.toUpperCase sql-or-resource) ".SQL")
-                        (io/read-template sql-or-resource)
-                        sql-or-resource)
-        substitutions (flatten (seq (merge @dbconfig-overrides (template/subst-map<- default-substitutions))))]
-    (apply template/partial-subst<- source-sql substitutions)))
+                        (io/read-file sql-or-resource)
+                        sql-or-resource)]
+    (apply template/partial-subst<- source-sql default-substitutions)))
 
 
 (def DbSpec
