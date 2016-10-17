@@ -119,6 +119,13 @@
           (is (= "Oink" (first result)))
           (is (= 1 (count result)))))
 
+      (testing "Prepare/execute from a SQL file"
+        (let [something (prepare "select-something.sql" :something "9")
+              result     (something ::row-fn :res)]
+
+          (is (= 9 (first result)))
+          (is (= 1 (count result)))))
+
       (testing "Prepare/execute, but overridding the dbconfig-override variable"
         (let [make-sound (prepare "select ${sound-column} from test_data where name='${default-animal}';" :default-animal "Cow")
               result     (make-sound ::row-fn :sound)]
