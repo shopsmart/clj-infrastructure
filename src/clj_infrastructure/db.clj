@@ -32,6 +32,7 @@
 
 ;; Error handling ----------------------------------------------------------------------------
 
+(declare dbconfig)
 
 (defrecord sql-failure [failures causes])
 
