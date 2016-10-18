@@ -349,10 +349,12 @@
         [sql
          sql-argument-names] (template/sql-vars (apply resolve-sql sql-template (template/kv-vector<- template-vars)))
 
+        jdbc-timeout         (/ (d/replace-nil (config JDBC-TIMEOUT-MILLIS) 0) 1000)  ; The API uses millis, but JDBC wants seconds
+
         prepared-statement   (db/prepare-statement
                               (:connection connection)
                               sql
-                              (merge {:timeout (config JDBC-TIMEOUT-MILLIS)} dblib-params))]
+                              (merge {:timeout jdbc-timeout} dblib-params))]
 
     (let [prepare-settings     settings
           prepare-dblib-params dblib-params]
