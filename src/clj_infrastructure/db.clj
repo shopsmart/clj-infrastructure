@@ -96,14 +96,15 @@
   "Default values used by the db library go here."
   {
    :fatal-exceptions ["only table or database owner can vacuum it"
-                      "only table or database owner can analyze it"]
+                      "only table or database owner can analyze it"
+                      "ERROR: current transaction is aborted, commands ignored"]
    :max-retries 5
    :jdbc-timeout-millis (millis/<-minutes 30)
    :retry-pause-millis (millis/<-seconds 5)
    :db-spec nothing
    :connection nothing
    :sql-fn nothing
-   :abort?-fn nothing})
+   :abort?-fn any-fatal-exceptions?})
 
 
 (def JDBC-TIMEOUT-MILLIS
