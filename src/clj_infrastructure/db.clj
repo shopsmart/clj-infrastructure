@@ -177,9 +177,6 @@
   (keyword (.toLowerCase (name k))))
 
 
-;; This is a forward reference; not moved because I want to keep config concerns together.
-(declare any-fatal-exceptions?)
-
 (def ^:private dbconfig-overrides
   "API for overridding values in the dbconfig-defaults map.  By default :job-name is defined
   to be the initial line of SQL and :abort?-fn==any-fatal-exceptions? .
