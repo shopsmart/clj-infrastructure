@@ -97,8 +97,8 @@
    :fatal-exceptions ["only table or database owner can vacuum it"
                       "only table or database owner can analyze it"]
    :max-retries 5
-   :jdbc-timeout-millis 5000
-   :retry-pause-millis 1000
+   :jdbc-timeout-millis (millis/<-minutes 30)
+   :retry-pause-millis (millis/<-seconds 5)
    :db-spec nothing
    :connection nothing
    :sql-fn nothing
