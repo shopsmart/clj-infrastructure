@@ -30,6 +30,65 @@
   (:gen-class))
 
 
+;; Error handling ----------------------------------------------------------------------------
+
+
+(defrecord sql-failure [failures causes])
+
+(defn failure-seqs
+  "SQLException can have nested exceptions both via (.getCause e) and via (.getNextException e).
+  Translate SQLException into a (sql-failure [failures causes]) record where failures and causes
+  are recursive lazy seqs of (.getNextException e) and (.getCause e) respectively."
+  [failure]
+  (letfn [(sql-failures [f] (when f (lazy-seq (cons f (sql-failures (.getNextException f))))))
+          (causes       [f] (when f (lazy-seq (cons f (causes (.getCause f))))))]
+    (cond
+      (instance? SQLException failure) (sql-failure. (sql-failures failure) (causes failure))
+      (instance? Throwable failure)    (sql-failure. [] (causes failure)))))
+
+
+;; Extend the failure? multimethod so that sql-failure instances are treated as failures.
+(defmethod failure? sql-failure [_] true)
+
+
+(defmacro try*-jdbc
+  "Return results of executing body or a sql-failure containing any thrown exceptions
+  unwrapped into seqs for easier debugging.  Note that failure-seqs is a failure according
+  to the failure? multimethod from the errors namespace."
+  [& body]
+  (try
+    (do ~@body)
+    (catch Throwable t#
+      (failure-seqs t#))))
+
+
+(defmacro jdbc-succeeds
+  "Asserts that the JDBC statements in body succeeded."
+  [& body]
+  `(is (sequential?
+        (try [~@body]
+             (catch Throwable t#
+               (failure-seqs t#))))))
+
+
+(s/defn fatal? :- s/Bool
+  "Returns true if this exception's message matches any of the substrings in fatal-exceptions and
+  false otherwise."
+  [e :- Throwable]
+  (let [msg                      (d/replace-nil (.getMessage e) "")
+        fatal-exception-messages (dbconfig {} :fatal-exceptions)]
+    (reduce (fn [fatal msg-substring] (if (str/includes? msg msg-substring) (reduced true))) false fatal-exception-messages)))
+
+
+(s/defn any-fatal-exceptions? :- s/Bool
+  "If any exceptions in the exceptions seq are fatal exceptions, returns true, else returns false.
+
+  This function is suitable for use as an abort?-fn in retry-with-timeout."
+  [exceptions :- [Throwable]]
+  (any? fatal? exceptions))
+
+
+
 ;; Configuration -----------------------------------------------------------------------------
 
 (def dbconfig-defaults
@@ -38,8 +97,8 @@
    :fatal-exceptions ["only table or database owner can vacuum it"
                       "only table or database owner can analyze it"]
    :max-retries 5
-   :jdbc-timeout-millis 5000
-   :retry-pause-millis 1000
+   :jdbc-timeout-millis (millis/<-minutes 30)
+   :retry-pause-millis (millis/<-seconds 5)
    :db-spec nothing
    :connection nothing
    :sql-fn nothing
@@ -117,9 +176,6 @@
   [k]
   (keyword (.toLowerCase (name k))))
 
-
-;; This is a forward reference; not moved because I want to keep config concerns together.
-(declare any-fatal-exceptions?)
 
 (def ^:private dbconfig-overrides
   "API for overridding values in the dbconfig-defaults map.  By default :job-name is defined
@@ -211,63 +267,6 @@
     (log/debug "Executing: <<EOF\n" censored-statement "\nEOF\n")))
 
 
-;; Error handling ---------------------------------------------------------------------
-
-
-(defrecord sql-failure [failures causes])
-
-(defn failure-seqs
-  "SQLException can have nested exceptions both via (.getCause e) and via (.getNextException e).
-  Translate SQLException into a (sql-failure [failures causes]) record where failures and causes
-  are recursive lazy seqs of (.getNextException e) and (.getCause e) respectively."
-  [failure]
-  (letfn [(sql-failures [f] (when f (lazy-seq (cons f (sql-failures (.getNextException f))))))
-          (causes       [f] (when f (lazy-seq (cons f (causes (.getCause f))))))]
-    (cond
-      (instance? SQLException failure) (sql-failure. (sql-failures failure) (causes failure))
-      (instance? Throwable failure)    (sql-failure. [] (causes failure)))))
-
-
-;; Extend the failure? multimethod so that sql-failure instances are treated as failures.
-(defmethod failure? sql-failure [_] true)
-
-
-(defmacro try*-jdbc
-  "Return results of executing body or a sql-failure containing any thrown exceptions
-  unwrapped into seqs for easier debugging.  Note that failure-seqs is a failure according
-  to the failure? multimethod from the errors namespace."
-  [& body]
-  (try
-    (do ~@body)
-    (catch Throwable t#
-      (failure-seqs t#))))
-
-
-(defmacro jdbc-succeeds
-  "Asserts that the JDBC statements in body succeeded."
-  [& body]
-  `(is (sequential?
-        (try [~@body]
-             (catch Throwable t#
-               (failure-seqs t#))))))
-
-
-(s/defn fatal? :- s/Bool
-  "Returns true if this exception's message matches any of the substrings in fatal-exceptions and
-  false otherwise."
-  [e :- Throwable]
-  (let [msg                      (d/replace-nil (.getMessage e) "")
-        fatal-exception-messages (dbconfig {} :fatal-exceptions)]
-    (reduce (fn [fatal msg-substring] (if (str/includes? msg msg-substring) (reduced true))) false fatal-exception-messages)))
-
-
-(s/defn any-fatal-exceptions? :- s/Bool
-  "If any exceptions in the exceptions seq are fatal exceptions, returns true, else returns false.
-
-  This function is suitable for use as an abort?-fn in retry-with-timeout."
-  [exceptions :- [Throwable]]
-  (any? fatal? exceptions))
-
 
 (defn resolve-sql
   "sql-or-resource can be either literal SQL or a path to a SQL resource file.  Resolves this parameter
@@ -350,10 +349,12 @@
         [sql
          sql-argument-names] (template/sql-vars (apply resolve-sql sql-template (template/kv-vector<- template-vars)))
 
+        jdbc-timeout         (/ (d/replace-nil (config JDBC-TIMEOUT-MILLIS) 0) 1000)  ; The API uses millis, but JDBC wants seconds
+
         prepared-statement   (db/prepare-statement
                               (:connection connection)
                               sql
-                              (merge {:timeout (config JDBC-TIMEOUT-MILLIS)} dblib-params))]
+                              (merge {:timeout jdbc-timeout} dblib-params))]
 
     (let [prepare-settings     settings
           prepare-dblib-params dblib-params]
