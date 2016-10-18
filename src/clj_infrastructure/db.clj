@@ -30,6 +30,65 @@
   (:gen-class))
 
 
+;; Error handling ----------------------------------------------------------------------------
+
+
+(defrecord sql-failure [failures causes])
+
+(defn failure-seqs
+  "SQLException can have nested exceptions both via (.getCause e) and via (.getNextException e).
+  Translate SQLException into a (sql-failure [failures causes]) record where failures and causes
+  are recursive lazy seqs of (.getNextException e) and (.getCause e) respectively."
+  [failure]
+  (letfn [(sql-failures [f] (when f (lazy-seq (cons f (sql-failures (.getNextException f))))))
+          (causes       [f] (when f (lazy-seq (cons f (causes (.getCause f))))))]
+    (cond
+      (instance? SQLException failure) (sql-failure. (sql-failures failure) (causes failure))
+      (instance? Throwable failure)    (sql-failure. [] (causes failure)))))
+
+
+;; Extend the failure? multimethod so that sql-failure instances are treated as failures.
+(defmethod failure? sql-failure [_] true)
+
+
+(defmacro try*-jdbc
+  "Return results of executing body or a sql-failure containing any thrown exceptions
+  unwrapped into seqs for easier debugging.  Note that failure-seqs is a failure according
+  to the failure? multimethod from the errors namespace."
+  [& body]
+  (try
+    (do ~@body)
+    (catch Throwable t#
+      (failure-seqs t#))))
+
+
+(defmacro jdbc-succeeds
+  "Asserts that the JDBC statements in body succeeded."
+  [& body]
+  `(is (sequential?
+        (try [~@body]
+             (catch Throwable t#
+               (failure-seqs t#))))))
+
+
+(s/defn fatal? :- s/Bool
+  "Returns true if this exception's message matches any of the substrings in fatal-exceptions and
+  false otherwise."
+  [e :- Throwable]
+  (let [msg                      (d/replace-nil (.getMessage e) "")
+        fatal-exception-messages (dbconfig {} :fatal-exceptions)]
+    (reduce (fn [fatal msg-substring] (if (str/includes? msg msg-substring) (reduced true))) false fatal-exception-messages)))
+
+
+(s/defn any-fatal-exceptions? :- s/Bool
+  "If any exceptions in the exceptions seq are fatal exceptions, returns true, else returns false.
+
+  This function is suitable for use as an abort?-fn in retry-with-timeout."
+  [exceptions :- [Throwable]]
+  (any? fatal? exceptions))
+
+
+
 ;; Configuration -----------------------------------------------------------------------------
 
 (def dbconfig-defaults
@@ -210,63 +269,6 @@
   (let [censored-statement (censor-statement statement)]
     (log/debug "Executing: <<EOF\n" censored-statement "\nEOF\n")))
 
-
-;; Error handling ---------------------------------------------------------------------
-
-
-(defrecord sql-failure [failures causes])
-
-(defn failure-seqs
-  "SQLException can have nested exceptions both via (.getCause e) and via (.getNextException e).
-  Translate SQLException into a (sql-failure [failures causes]) record where failures and causes
-  are recursive lazy seqs of (.getNextException e) and (.getCause e) respectively."
-  [failure]
-  (letfn [(sql-failures [f] (when f (lazy-seq (cons f (sql-failures (.getNextException f))))))
-          (causes       [f] (when f (lazy-seq (cons f (causes (.getCause f))))))]
-    (cond
-      (instance? SQLException failure) (sql-failure. (sql-failures failure) (causes failure))
-      (instance? Throwable failure)    (sql-failure. [] (causes failure)))))
-
-
-;; Extend the failure? multimethod so that sql-failure instances are treated as failures.
-(defmethod failure? sql-failure [_] true)
-
-
-(defmacro try*-jdbc
-  "Return results of executing body or a sql-failure containing any thrown exceptions
-  unwrapped into seqs for easier debugging.  Note that failure-seqs is a failure according
-  to the failure? multimethod from the errors namespace."
-  [& body]
-  (try
-    (do ~@body)
-    (catch Throwable t#
-      (failure-seqs t#))))
-
-
-(defmacro jdbc-succeeds
-  "Asserts that the JDBC statements in body succeeded."
-  [& body]
-  `(is (sequential?
-        (try [~@body]
-             (catch Throwable t#
-               (failure-seqs t#))))))
-
-
-(s/defn fatal? :- s/Bool
-  "Returns true if this exception's message matches any of the substrings in fatal-exceptions and
-  false otherwise."
-  [e :- Throwable]
-  (let [msg                      (d/replace-nil (.getMessage e) "")
-        fatal-exception-messages (dbconfig {} :fatal-exceptions)]
-    (reduce (fn [fatal msg-substring] (if (str/includes? msg msg-substring) (reduced true))) false fatal-exception-messages)))
-
-
-(s/defn any-fatal-exceptions? :- s/Bool
-  "If any exceptions in the exceptions seq are fatal exceptions, returns true, else returns false.
-
-  This function is suitable for use as an abort?-fn in retry-with-timeout."
-  [exceptions :- [Throwable]]
-  (any? fatal? exceptions))
 
 
 (defn resolve-sql
