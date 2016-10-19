@@ -120,13 +120,32 @@
 
   (testing "simple prepare with configuration set using dbconfig-override."
     (jdbc/with-db-connection [conn (dbconfig {} DB-SPEC)]
-      (dbconfig-override SQL-FN jdbc/query CONNECTION conn ABORT?-FN (constantly true))
+      (dbconfig-override SQL-FN jdbc/query
+                         CONNECTION conn
+                         ABORT?-FN (constantly true)
+                         :sound-column "sound"
+                         :default-animal "Pig")     ; Note: have to be careful what you override: the names are global!
 
-      (let [make-sound (prepare "select sound from test_data where name='Pig';")
-            result     (make-sound ::row-fn :sound)]
+      (testing "Prepare/execute"
+        (let [make-sound (prepare "select ${sound-column} from test_data where name='${default-animal}';")
+              result     (make-sound ::row-fn :sound)]
 
-        (is (= "Oink" (first result)))
-        (is (= 1 (count result))))))
+          (is (= "Oink" (first result)))
+          (is (= 1 (count result)))))
+
+      (testing "Prepare/execute from a SQL file"
+        (let [something (prepare "select-something.sql" :something "9")
+              result     (something ::row-fn :res)]
+
+          (is (= 9 (first result)))
+          (is (= 1 (count result)))))
+
+      (testing "Prepare/execute, but overridding the dbconfig-override variable"
+        (let [make-sound (prepare "select ${sound-column} from test_data where name='${default-animal}';" :default-animal "Cow")
+              result     (make-sound ::row-fn :sound)]
+
+          (is (= "Moo" (first result)))
+          (is (= 1 (count result)))))))
 
 
   (testing "Prepare with both templates and bind variables; configuration set using parameters"
