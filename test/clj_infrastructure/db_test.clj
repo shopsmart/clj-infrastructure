@@ -39,7 +39,7 @@
          :user        "sa"
          :password    ""})
 
-
+(+ 3 2)
 ;; Only the transactional tests use this
 (def current-db :h2)
 
@@ -55,9 +55,9 @@
 (def test-table (-> settings current-db :test-table))
 
 (def config (partial dbconfig {DB-SPEC       (-> settings current-db :spec)
-                         ABORT?-FN     (constantly true)
-                         :test-table   (-> settings current-db :test-table)
-                         :test-table-2 (-> settings current-db :test-table-2)}))
+                               ABORT?-FN     (constantly true)
+                               :test-table   (-> settings current-db :test-table)
+                               :test-table-2 (-> settings current-db :test-table-2)}))
 
 (dbconfig-override :test-table (config :test-table))
 
