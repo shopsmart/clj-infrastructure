@@ -39,9 +39,9 @@
          :user        "sa"
          :password    ""})
 
-(+ 3 2)
 ;; Only the transactional tests use this
 (def current-db :h2)
+;(def current-db :redshift)
 
 (def settings {:redshift {:test-table "integration_or_unit_test.transaction_test_777"
                           :test-table-2 "integration_or_unit_test.transaction_test_999"
@@ -69,7 +69,7 @@
    (execute! "drop table if exists ${test-table-name};"
              CONNECTION conn
              :test-table-name table-name)
-   (execute! "create table if not exists ${test-table-name} (id bigint, description varchar(1000));"
+   (execute! "create table if not exists ${test-table-name} (id bigint, description varchar(1000), id2 bigint identity);"
              CONNECTION conn
              :test-table-name table-name))
   ([conn]
@@ -300,7 +300,9 @@
 
 (defstatement j-insert "insert into ${table} values ${values}")
 (defstatement j-update "update ${table} set ${values} where ${where}")
+(defstatement j-delete "delete from ${table} where ${where}")
 (defquery     j-select "select * from ${table} ${where}" :where "")
+(defstatement j-truncate  "truncate ${table};")
 
 
 (deftest transaction-behavior
@@ -600,4 +602,53 @@
                  (is (not (empty? (jdbc/query conn2 [(q "select * from ${test-table}")]))))))))))))
 
 
+(deftest infinite-loop-retry
+  (jdbc/with-db-transaction [trans1 (config DB-SPEC)]
+    (create-test-table trans1 (config :test-table))
+    (j-update CONNECTION trans1 :table (config :test-table) :values "blah = blah" :where "invalid sql")))
+
+(deftest serializable-transaction-behavior
+
+  (clojure.pprint/pprint (config DB-SPEC))
+
+  (is (thrown-with-msg? org.postgresql.util.PSQLException #"Detail: Serializable isolation violation"
+
+    (testing "Multiple transactions can write to the same table without violating serializable transaciton integrity"
+
+      ;; Setup/initialization
+      (jdbc/with-db-transaction [trans3 (config DB-SPEC)]
+
+      (jdbc/with-db-transaction [trans1 (config DB-SPEC)]
+        (create-test-table trans1 (config :test-table))
+        (create-test-table trans1 "integration_or_unit_test.transaction_test_900")
+        (create-test-table trans1 "integration_or_unit_test.transaction_test_901")
+        (create-test-table trans1 "integration_or_unit_test.transaction_test_903"))
+
+     (j-select CONNECTION trans3 :table "integration_or_unit_test.transaction_test_901" :where "")
+
+      (jdbc/with-db-transaction [trans1 (config DB-SPEC)]
+        (j-insert CONNECTION trans1 :table (config :test-table) :values "(2, 'Row 1 - Trans 1')")
+        (j-insert CONNECTION trans1 :table "integration_or_unit_test.transaction_test_900" :values "(2, 'Row 1 - Trans 1')")
+        (j-insert CONNECTION trans1 :table "integration_or_unit_test.transaction_test_901" :values "(2, 'Row 1 - Trans 1')"))
+
+        (jdbc/with-db-transaction [trans2 (config DB-SPEC)]
+
+          (j-update CONNECTION trans2 :table "integration_or_unit_test.transaction_test_900" :values "id = 1" :where "id = 2")
+          (j-update CONNECTION trans2 :table "integration_or_unit_test.transaction_test_901" :values "id = 2" :where "id = 1")
+          (j-truncate CONNECTION trans2 :table (config :test-table))
+          (j-truncate CONNECTION trans2 :table "integration_or_unit_test.transaction_test_900")
+
+            (j-insert CONNECTION trans2 :table (config :test-table) :values "(3, 'Row 3 - Trans 2')")
+            (j-delete CONNECTION trans2 :table (config :test-table) :where  "id = 3"))
+
+      (jdbc/with-db-transaction [trans1 (config DB-SPEC)]
+        (j-insert CONNECTION trans1 :table (config :test-table) :values "(2, 'Row 2 - Trans 1')")
+
+        (j-delete CONNECTION trans1 :table (config :test-table) :where "id >= 10")
+
+        (testing "Update" (j-update CONNECTION trans1 :table (config :test-table) :values "description = 'Updated value: Row 2 - Trans 1'" :where "id = 3"))
+
+        (testing "delete" (j-delete CONNECTION trans3 :table "integration_or_unit_test.transaction_test_900" :where "id >= 0"))))))))
+
 (run-tests)
+
