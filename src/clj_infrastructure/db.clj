@@ -243,6 +243,50 @@
         {:settings {} :template-vars {} :dblib-params {}})))
 
 
+;; Connection and transaction management ---------------------------------------------------
+
+
+(defn with-overrides
+ "Save the current database library overrides.  When exiting scope, restore all of the prior
+ dbconfig-overrides."
+  [f & args]
+  (let [old-overrides @dbconfig-overrides]
+    (try
+      (apply f args)
+      (finally
+        (reset! dbconfig-overrides old-overrides)))))
+
+
+(defmacro with-dbconfig-overrides
+ "Save the current database library overrides.  When exiting scope, restore all of the prior
+ dbconfig-overrides."
+ [& body]
+ `(with-overrides (fn [] ~@body)))
+
+
+(defmacro dbconfig-connection
+  "Create a DYNAMIC scope binding to a new database connection identified by spec within the
+  dbconfig-overrides and executes body within that scope.  Saves the state of dbconfig-overrides
+  at the beginning and restores them at the end."
+  [spec & body]
+  `(with-dbconfig-overrides
+    (jdbc/with-db-connection [new-conn# ~spec]
+      (dbconfig-override ~DB-SPEC ~spec)
+      (dbconfig-override ~CONNECTION new-conn#)
+      ~@body)))
+
+
+(defmacro dbconfig-transaction
+  "Create a DYNAMIC scope binding to a new transaction identified by spec within the dbconfig-overrides
+  and executes body within that scope.  Saves the state of dbconfig-overrides at the beginning and restores
+  them at the end."
+  [spec & body]
+  `(with-dbconfig-overrides
+    (jdbc/with-db-transaction [new-conn# ~spec]
+      (dbconfig-override ~DB-SPEC ~spec)
+      (dbconfig-override ~CONNECTION new-conn#)
+      ~@body)))
+
 
 ;; SQL Logging -----------------------------------------------------------------------------
 
