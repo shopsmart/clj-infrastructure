@@ -1,4 +1,4 @@
-(defproject com.github.shopsmart/clj-infrastructure "0.1.8"
+(defproject com.github.shopsmart/clj-infrastructure "0.1.9"
   :description "Infrastructure helpers for AWS, database, etc."
   :url "https://github.com/shopsmart/clj-infrastructure"
 
@@ -23,4 +23,4 @@
                  [org.clojure/tools.logging "0.3.1"]
                  [prismatic/schema "1.1.1"]
                  [org.clojure/java.jdbc "0.6.2-alpha2"]
-                 [com.github.shopsmart/clj-foundation "0.9.17"]])
+                 [com.github.shopsmart/clj-foundation "0.9.18"]])

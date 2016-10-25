@@ -40,16 +40,19 @@
          :password    ""})
 
 
-;; Only the transactional tests use this
+
 (def current-db :h2)
 
-(def settings {:redshift {:test-table "integration_or_unit_test.transaction_test_777"
-                          :test-table-2 "integration_or_unit_test.transaction_test_999"
-                          :spec (secrets :contentshift)}
 
-               :h2 {:test-table "transaction_test_777"
+(defn test-table [basename] (str basename (System/getProperty "user.name"))) ; so it's impossible for two users' tests to conflict
+
+(def settings {:redshift {:test-table   (test-table "integration_or_unit_test.transaction_test_777")
+                          :test-table-2 (test-table "integration_or_unit_test.transaction_test_999")
+                          :spec         (secrets :contentshift)}
+
+               :h2 {:test-table   "transaction_test_777"
                     :test-table-2 "transaction_test_999"
-                    :spec h2}})
+                    :spec         h2}})
 
 
 (def test-table (-> settings current-db :test-table))
