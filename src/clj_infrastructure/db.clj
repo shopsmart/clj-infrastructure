@@ -273,7 +273,7 @@
   at the beginning and restores them at the end."
   [spec & body]
   `(with-dbconfig-overrides
-    (jdbc/with-db-connection [new-conn# ~spec]
+    (clojure.java.jdbc/with-db-connection [new-conn# ~spec]
       (dbconfig-override ~DB-SPEC ~spec)
       (dbconfig-override ~CONNECTION new-conn#)
       ~@body)))
@@ -285,7 +285,7 @@
   them at the end."
   [spec & body]
   `(with-dbconfig-overrides
-    (jdbc/with-db-transaction [new-conn# ~spec]
+    (clojure.java.jdbc/with-db-transaction [new-conn# ~spec]
       (dbconfig-override ~DB-SPEC ~spec)
       (dbconfig-override ~CONNECTION new-conn#)
       ~@body)))
