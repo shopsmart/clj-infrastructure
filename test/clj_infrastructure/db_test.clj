@@ -48,7 +48,7 @@
 
 (def settings {:redshift {:test-table     (test-table "transaction_test_777")
                           :test-table-2   (test-table "transaction_test_999")
-                          :spec           (secrets :contentshift)}
+                          :spec           (secrets :integration_or_unit_test)}
 
                :h2 {:test-table   "transaction_test_777"
                     :test-table-2 "transaction_test_999"
