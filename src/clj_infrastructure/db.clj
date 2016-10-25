@@ -95,8 +95,11 @@
 (def dbconfig-defaults
   "Default values used by the db library go here."
   {
-   :fatal-exceptions ["only table or database owner can vacuum it"
-                      "only table or database owner can analyze it"]
+   :fatal-exceptions ["Serializable isolation violation on table"
+                      "current transaction is aborted, commands ignored until end of transaction block"
+                      "only table or database owner can vacuum it"
+                      "only table or database owner can analyze it"
+                      "org.postgresql.util.PSQLException"]
    :max-retries 5
    :jdbc-timeout-millis (millis/<-minutes 30)
    :retry-pause-millis (millis/<-seconds 5)
