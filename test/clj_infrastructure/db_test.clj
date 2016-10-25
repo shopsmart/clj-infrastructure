@@ -46,9 +46,9 @@
 
 (defn test-table [basename] (str basename (System/getProperty "user.name"))) ; so it's impossible for two users' tests to conflict
 
-(def settings {:redshift {:test-table   (test-table "integration_or_unit_test.transaction_test_777")
-                          :test-table-2 (test-table "integration_or_unit_test.transaction_test_999")
-                          :spec         (secrets :contentshift)}
+(def settings {:redshift {:test-table     (test-table "transaction_test_777")
+                          :test-table-2   (test-table "transaction_test_999")
+                          :spec           (secrets :contentshift)}
 
                :h2 {:test-table   "transaction_test_777"
                     :test-table-2 "transaction_test_999"
