@@ -152,7 +152,7 @@
       (dbconfig-override SQL-FN jdbc/query
                          ABORT?-FN (constantly true)
                          :sound-column "sound"
-                         :default-animal "Pig")     ; Note: have to be careful what you override: the names are global!
+                         :default-animal "Pig")     ; Note: have to be careful what you override: the names are global to this dbconfig-connection
 
       (testing "Prepare/execute"
         (let [make-sound (prepare "select ${sound-column} from test_data where name='${default-animal}';")
