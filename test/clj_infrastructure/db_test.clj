@@ -90,8 +90,6 @@
   ABORT?-FN (constantly true))
 
 
-
-
 (deftest infinite-loop-retry-fixed
   (jdbc/with-db-transaction [trans1 (config DB-SPEC)]
     (create-test-table trans1 (config :test-table))
