@@ -42,7 +42,7 @@
 
 
 (def current-db :h2)
-
+;(def current-db :redshift)
 
 (defn test-table [basename] (str basename (System/getProperty "user.name"))) ; so it's impossible for two users' tests to conflict
 
@@ -482,7 +482,6 @@
 
        (testing "The failed transaction's inserts rolled back."
          (is (not (seq (query "select * from ${test-table} where id >= 10" CONNECTION conn))))))))
-
 
   (testing "Validate (.setAutoCommit conn false) doesn't respect autocommit=false in db-do-commands."
       (jdbc/with-db-connection [conn (config DB-SPEC)]

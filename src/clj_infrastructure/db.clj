@@ -76,9 +76,9 @@
   "Returns true if this exception's message matches any of the substrings in fatal-exceptions and
   false otherwise."
   [e :- Throwable]
-  (let [msg                      (d/replace-nil (.getMessage e) "")
+  (let [ex-str                   (d/replace-nil (str e) "")
         fatal-exception-messages (dbconfig {} :fatal-exceptions)]
-    (reduce (fn [fatal msg-substring] (if (str/includes? msg msg-substring) (reduced true))) false fatal-exception-messages)))
+    (reduce (fn [fatal ex-str-substring] (if (str/includes? ex-str ex-str-substring) (reduced true))) false fatal-exception-messages)))
 
 
 (s/defn any-fatal-exceptions? :- s/Bool
