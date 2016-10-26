@@ -124,12 +124,26 @@
        :sound "RRRRuuuuff"}]))
 
 
-  (testing "dbconfig mechanism"
-    (dbconfig-override DB-SPEC h2)
+  (testing "dbconfig mechanism: "
+    (with-dbconfig-overrides
+      (testing "Set a default value using dbconfig-override"
+        (dbconfig-override DB-SPEC "overridden")
+        (is (= "overridden" (dbconfig {} DB-SPEC))))
 
-    (is (= "sa" (config DB-SPEC :user)))
+      (testing "Per-call override maps shadow dbconfig-override."
+        (is (= "sa" (dbconfig {DB-SPEC h2} DB-SPEC :user)))
+        (is (= :nothingness-and-emptiness (dbconfig {DB-SPEC :nothingness-and-emptiness} DB-SPEC))))
 
-    (is (= :nothingness-and-emptiness (dbconfig {DB-SPEC :nothingness-and-emptiness} DB-SPEC))))
+      (testing "A partial function with a constant override map shadows dbconfig-override: "
+        (testing "a value inside the constant override map shadows dbconfig-override"
+          (dbconfig-override DB-SPEC :some-garbage)
+
+          (is (not= :some-garbage (config DB-SPEC)))
+          (is (= (-> settings current-db :spec :user) (config DB-SPEC :user))))
+
+        (testing "values not in the constant override map may still be overridden"
+          (dbconfig-override :random-key "random-value")
+          (is (= "random-value" (config :random-key)))))))
 
 
   (testing "dbconfig-connection and dbconfig-transaction"
