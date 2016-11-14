@@ -17,7 +17,7 @@
   )
   (:gen-class))
 
-; CONFIG (BD_APP_COMMON_CONFIG_PATH):
+; CONFIG (LIB_CLJ_INFRA_CONFIG_FILE_PATH):
 ;
 ; { :dropbox {
 ;     :apps [
