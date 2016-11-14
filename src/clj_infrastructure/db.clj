@@ -72,24 +72,6 @@
                (failure-seqs t#))))))
 
 
-(s/defn fatal? :- s/Bool
-  "Returns true if this exception's message matches any of the substrings in fatal-exceptions and
-  false otherwise."
-  [e :- Throwable]
-  (let [ex-str                   (d/replace-nil (str e) "")
-        fatal-exception-messages (dbconfig {} :fatal-exceptions)]
-    (reduce (fn [fatal ex-str-substring] (if (str/includes? ex-str ex-str-substring) (reduced true))) false fatal-exception-messages)))
-
-
-(s/defn any-fatal-exceptions? :- s/Bool
-  "If any exceptions in the exceptions seq are fatal exceptions, returns true, else returns false.
-
-  This function is suitable for use as an abort?-fn in retry-with-timeout."
-  [exceptions :- [Throwable]]
-  (any? fatal? exceptions))
-
-
-
 ;; Configuration -----------------------------------------------------------------------------
 
 (def dbconfig-defaults
@@ -186,9 +168,12 @@
   to be the initial line of SQL and :abort?-fn==any-fatal-exceptions? .
 
   Clients can override values using dbconfig-override."
-  (atom {:job-name  #(first (template/lines %))
-         :abort?-fn any-fatal-exceptions?
-         :sql-fn    nothing}))          ; Must be overridden later on
+  (atom {}))
+
+
+(defn- kvs->kv-pairs
+  [[k v]]
+  [(constant->keyword k) v])
 
 
 (defn dbconfig
@@ -200,11 +185,6 @@
     (apply read-config config-values config-keys)))
 
 
-(defn- kvs->kv-pairs
-  [[k v]]
-  [(constant->keyword k) v])
-
-
 (defn dbconfig-override
   "Override or set dbconfig values for this session.  dbconfig keys (above) must identify the config
   constant to change."
@@ -213,6 +193,39 @@
   (let [overrides (apply assoc {} (mapcat kvs->kv-pairs (partition 2 kvs)))]
     (swap! dbconfig-overrides #(merge % overrides))))
 
+
+(s/defn fatal? :- s/Bool
+  "Returns true if this exception's message matches any of the substrings in fatal-exceptions and
+  false otherwise."
+  [e :- Throwable]
+  (let [ex-str                   (d/replace-nil (str e) "")
+        fatal-exception-messages (dbconfig {} :fatal-exceptions)]
+    (reduce (fn [fatal ex-str-substring] (if (str/includes? ex-str ex-str-substring) (reduced true))) false fatal-exception-messages)))
+
+
+(s/defn any-fatal-exceptions? :- s/Bool
+  "If any exceptions in the exceptions seq are fatal exceptions, returns true, else returns false.
+
+  This function is suitable for use as an abort?-fn in retry-with-timeout."
+  [exceptions :- [Throwable]]
+  (any? fatal? exceptions))
+
+
+(s/defn fatal? :- s/Bool
+  "Returns true if this exception's message matches any of the substrings in fatal-exceptions and
+  false otherwise."
+  [e :- Throwable]
+  (let [msg                      (d/replace-nil (.getMessage e) "")
+        fatal-exception-messages (dbconfig {} :fatal-exceptions)]
+    (reduce (fn [fatal msg-substring] (if (str/includes? msg msg-substring) (reduced true))) false fatal-exception-messages)))
+
+
+(s/defn any-fatal-exceptions? :- s/Bool
+  "If any exceptions in the exceptions seq are fatal exceptions, returns true, else returns false.
+
+  This function is suitable for use as an abort?-fn in retry-with-timeout."
+  [exceptions :- [Throwable]]
+  (any? fatal? exceptions))
 
 
 (def VarMaps
@@ -223,6 +236,7 @@
 
 
 (def this-namespace (.toString *ns*))
+
 
 (s/defn varmaps<- :- VarMaps
   "Partition kv pairs into :settings, :template-vars, and :dblib-params kvs maps.
@@ -661,3 +675,12 @@
         col-value-pairs (partition 2 (rest key-string-parts))
         where-conditions (map (fn [[col value]] (str col "='" value "'")) col-value-pairs)]
     (str/join " and " where-conditions)))
+
+; Setup defaults overrides in a way that prevents circular dependencies
+; (defaults that depend on not-yet defined DB lib functions)
+
+(dbconfig-override
+  :job-name  #(first (template/lines %))
+  :abort?-fn any-fatal-exceptions?
+  :sql-fn    nothing)
+
