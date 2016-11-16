@@ -37,11 +37,9 @@
   (catch Exception e
     (throw (ex-info "Unable to locate configuration" {:env-var-name common-config-file-path :default-config-file-path default-config-file-path}))))
 
-(clojure.pprint/pprint (secret-config :dropbox :apps))
-
-(def tmp-dir              "/tmp")
-(def tmp-file-name-base   (str "unit-test." (str *ns*)))
-(def tmp-file-name-ext    ".tmp")
+(def tmp-dir                "/tmp")
+(def tmp-file-name-base     (str "unit-test." (str *ns*)))
+(def tmp-file-name-ext      ".tmp")
 
 (def dbox-app-conf          (first (filter #(= (:app-name %) "Dataservices ETL App 001") (secret-config :dropbox :apps))))
 (def dbox-auth-access-token (get-in dbox-app-conf [:auth :oauth2-access-token]))

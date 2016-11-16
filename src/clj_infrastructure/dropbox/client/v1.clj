@@ -16,121 +16,104 @@
 
 ; Map of Dropbox version 1 API metadata
 
+(def ^:private dbox-url-www     "https://www.dropboxapi.com/1")
+(def ^:private dbox-url-api     "https://api.dropboxapi.com/1")
+(def ^:private dbox-url-api-2   "https://api.dropbox.com/1")
+(def ^:private dbox-url-content "https://content.dropboxapi.com/1")
+
+; API metadata - URL groups separated by newline
 (def api-meta-map {
   :authorize {
-    :url    "https://www.dropboxapi.com/1/oauth/authorize"
-    :method "GET"
-  }
+    :url    (format "%s/oauth/authorize" dbox-url-www)
+    :method "GET"}
 
   :request-token {
-    :url    "https://api.dropboxapi.com/1/oauth/request_token"
-    :method "POST"
-  }
+    :url    (format "%s/oauth/request_token" dbox-url-api)
+    :method "POST"}
   :access_token {
-    :url    "https://api.dropboxapi.com/1/oauth/access_token" 
-    :method "POST"
-  }
+    :url    (format "%s/oauth/access_token" dbox-url-api) 
+    :method "POST"}
   :token {
-    :url    "https://api.dropboxapi.com/1/oauth2/token" 
-    :method "POST"
-  }
+    :url    (format "%s/oauth2/token" dbox-url-api) 
+    :method "POST"}
   :token_from_oauth1 {
-    :url    "https://api.dropboxapi.com/1/oauth2/token_from_oauth1" 
-    :method "POST"
-  }
+    :url    (format "%s/oauth2/token_from_oauth1" dbox-url-api) 
+    :method "POST"}
   :disable_access_token {
-    :url    "https://api.dropboxapi.com/1/disable_access_token" 
-    :method "POST"
-  }
+    :url    (format "%s/disable_access_token" dbox-url-api) 
+    :method "POST"}
   :info {
-    :url    "https://api.dropboxapi.com/1/account/info" 
-    :method "GET"
-  }
+    :url    (format "%s/account/info" dbox-url-api) 
+    :method "GET"}
   :metadata {
-    :url    "https://api.dropboxapi.com/1/metadata/auto"
-    :method "GET"
-  }
+    :url    (format "%s/metadata/auto" dbox-url-api)
+    :method "GET"}
   :link {
-    :url    "https://api.dropbox.com/1/metadata/link" 
-    :method "POST"
-  }
+    :url    (format "%s/metadata/link" dbox-url-api-2) 
+    :method "POST"}
   :delta {
-    :url    "https://api.dropboxapi.com/1/delta" 
-    :method "POST"
-  }
+    :url    (format "%s/delta" dbox-url-api) 
+    :method "POST"}
   :latest_cursor {
-    :url    "https://api.dropboxapi.com/1/delta/latest_cursor" 
-    :method "POST"
-  }
+    :url    (format "%s/delta/latest_cursor" dbox-url-api) 
+    :method "POST"}
   :revisions {
-    :url    "https://api.dropboxapi.com/1/revisions/auto"
-    :method "GET"
-  }
+    :url    (format "%s/revisions/auto" dbox-url-api)
+    :method "GET"}
   :restore {
-    :url    "https://api.dropboxapi.com/1/restore/auto"
-    :method "POST"
-  }
+    :url    (format "%s/restore/auto" dbox-url-api)
+    :method "POST"}
   :search {
-    :url    "https://api.dropboxapi.com/1/search/auto"
-    :method "GET"
-  }
+    :url    (format "%s/search/auto" dbox-url-api)
+    :method "GET"}
   :shares {
-    :url    "https://api.dropboxapi.com/1/shares/auto"
-    :method "POST"
-  }
+    :url    (format "%s/shares/auto" dbox-url-api)
+    :method "POST"}
   :media {
-    :url    "https://api.dropboxapi.com/1/media/auto"
-    :method "POST"
-  }
+    :url    (format "%s/media/auto" dbox-url-api)
+    :method "POST"}
   :copy_ref {
-    :url    "https://api.dropboxapi.com/1/copy_ref/auto"
-    :method "GET"
-  }
+    :url    (format "%s/copy_ref/auto" dbox-url-api)
+    :method "GET"}
   :shared_folders {
-    :url    "https://api.dropboxapi.com/1/shared_folders"
-    :method "GET"
-  }
+    :url    (format "%s/shared_folders" dbox-url-api)
+    :method "GET"}
   :save_url {
-    :url    "https://api.dropboxapi.com/1/save_url/auto"
-    :method "POST"
-  }
+    :url    (format "%s/save_url/auto" dbox-url-api)
+    :method "POST"}
   :save_url_job {
-    :url    "https://api.dropboxapi.com/1/save_url_job"
-    :method "GET"
-  }
+    :url    (format "%s/save_url_job" dbox-url-api)
+    :method "GET"}
   :copy {
-    :url    "https://api.dropboxapi.com/1/fileops/copy" 
-    :method "POST"
-  }
+    :url    (format "%s/fileops/copy" dbox-url-api) 
+    :method "POST"}
   :create_folder {
-    :url    "https://api.dropboxapi.com/1/fileops/create_folder" 
-    :method "POST"
-  }
+    :url    (format "%s/fileops/create_folder" dbox-url-api) 
+    :method "POST"}
   :delete {
-    :url    "https://api.dropboxapi.com/1/fileops/delete" 
-    :method "POST"
-  }
+    :url    (format "%s/fileops/delete" dbox-url-api) 
+    :method "POST"}
   :move {
-    :url    "https://api.dropboxapi.com/1/fileops/move" 
-    :method "POST"
-  }
+    :url    (format "%s/fileops/move" dbox-url-api) 
+    :method "POST"}
+
   :permanently_delete {
-    :url    "https://api.dropbox.com/1/fileops/permanently_delete" 
-    :method "POST"
-  }
+    :url    (format "%s/fileops/permanently_delete" dbox-url-api-2) 
+    :method "POST"}
+
   :files_get {
-    :url    "https://content.dropboxapi.com/1/files/auto/"
-    :method "GET"
-  }
+    :url    (format "%s/files/auto/" dbox-url-content)
+    :method "GET"}
   :files_put {
-    :url    "https://content.dropboxapi.com/1/files_put/auto/"
+    :url    (format "%s/files_put/auto/" dbox-url-content)
     :method "POST"
-    :params #{:locale :overwrite :parent_rev :autorename}
-  }
+    :params #{:locale :overwrite :parent_rev :autorename}}
 })
 
+(def ^:dynamic *access-token*)
+
 (defn api-call-valid?
-  "Verify if the provided action keyword and optional parameter keywords are valid.
+  "Verify the provided action keyword and optional parameter keywords are valid.
 
    @return is-valid? true if valid, nil if not valid"
   [action-kw & [param-vec]]
@@ -144,9 +127,6 @@
             (if-not (contains? valid-param-set elem) (reduced false) true))
           param-vec))
          true)))
-
-
-(def ^:dynamic *access-token*)
 
 
 (defmacro with-credentials
@@ -182,14 +162,14 @@
 
 
 (defn resolve-access-token
-  "Retrieves the [optionally] supplied access token or the lexically scoped access token value,
+  "Retrieves the [optionally] supplied access token or the dynamically scoped access token value,
    with the supplied value taking precedence."
   [& [access-token]]
   (or access-token *access-token*))
 
 
 (defn resolve-and-validate-access-token
-  "Retrieves and validates the [optionally] supplied access token or the lexically scoped access token value,
+  "Retrieves and validates the [optionally] supplied access token or the dynamically scoped access token value,
    with the supplied value taking precedence."
   [& [access-token]]
   (let [access-token (resolve-access-token access-token)]
@@ -199,6 +179,8 @@
 
 
 (defn api-action-kw->api-call-result
+  "Access the web API, using a provided action keyword (@see api-meta-map) to lookup API metadata,
+   with the supplied options."
   [action-kw & [{:keys [url-suffix http-opt-map access-token]}]]
   (let [access-token (resolve-and-validate-access-token access-token)]
     (let [api-meta-map  (api-action-kw->api-call-meta action-kw)
@@ -211,6 +193,9 @@
 
 
 (defn dbox-file->file-stream
+  "Wrapper function for downloading a file.
+
+  @return file-stream Returns the downloaded file as a file stream."
   [file-path & [{:keys [access-token]}]]
   (let [access-token (resolve-and-validate-access-token access-token)]
     (:body
@@ -227,6 +212,11 @@
 
 
 (defn file-stream->dbox-file
+  "Wrapper function for uploading a file.
+
+  @param    file-stream   A file-stream for the file to be uploaded.
+  @param    remote-path   A remote / destination path.
+  @param    opt-map       A map of options"
   [file-stream remote-path & [{:keys [access-token param-map]}]]
   (let [access-token    (resolve-and-validate-access-token access-token)]
     (api-action-kw->api-call-result :files_put {
