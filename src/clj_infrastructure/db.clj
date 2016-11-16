@@ -211,23 +211,6 @@
   (any? fatal? exceptions))
 
 
-(s/defn fatal? :- s/Bool
-  "Returns true if this exception's message matches any of the substrings in fatal-exceptions and
-  false otherwise."
-  [e :- Throwable]
-  (let [msg                      (d/replace-nil (.getMessage e) "")
-        fatal-exception-messages (dbconfig {} :fatal-exceptions)]
-    (reduce (fn [fatal msg-substring] (if (str/includes? msg msg-substring) (reduced true))) false fatal-exception-messages)))
-
-
-(s/defn any-fatal-exceptions? :- s/Bool
-  "If any exceptions in the exceptions seq are fatal exceptions, returns true, else returns false.
-
-  This function is suitable for use as an abort?-fn in retry-with-timeout."
-  [exceptions :- [Throwable]]
-  (any? fatal? exceptions))
-
-
 (def VarMaps
   "A schema for a parsed kv argument list."
   {:template-vars {s/Keyword s/Any}
