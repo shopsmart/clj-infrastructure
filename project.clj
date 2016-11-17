@@ -1,4 +1,4 @@
-(defproject com.github.shopsmart/clj-infrastructure "0.1.13"
+(defproject com.github.shopsmart/clj-infrastructure "0.1.14"
   :description "Infrastructure helpers for AWS, database, etc."
   :url "https://github.com/shopsmart/clj-infrastructure"
 
@@ -23,7 +23,7 @@
                  [org.clojure/tools.logging           "0.3.1"]
                  [prismatic/schema                    "1.1.1"]
                  [org.clojure/java.jdbc               "0.6.2-alpha2"]
-                 [com.github.shopsmart/clj-foundation "0.9.21"]
+                 [com.github.shopsmart/clj-foundation "0.9.22"]
                  [cheshire                            "5.6.3"]  ; JSON processing
                  [com.cemerick/url                    "0.1.1"]  ; URL construction
                  [digest                              "1.4.5"]  ; Hashing functions
