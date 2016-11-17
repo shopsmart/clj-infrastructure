@@ -17,7 +17,7 @@
   )
   (:gen-class))
 
-; CONFIG (LIB_CLJ_INFRA_CONFIG_FILE_PATH):
+; CONFIG (env: $CLJ_INFRA_CONFIG_PATH):
 ;
 ; { :dropbox {
 ;     :apps [
@@ -28,7 +28,7 @@
 ;           :password "<redacted-site-password>"
 ;           :oauth2-access-token "<redacted-app-access-token>" } }]} }
 
-(def common-config-file-path  "LIB_CLJ_INFRA_CONFIG_FILE_PATH")
+(def common-config-file-path  "CLJ_INFRA_CONFIG_PATH")
 (def default-config-file-path "config/config.edn")
 
 (try

@@ -20,7 +20,7 @@ Export environment variable(s) (or set on command line) for EDN format configura
 
 Set environment variable to override default configuration file location:
 
-    $ export LIB_CLJ_INFRA_CONFIG_FILE_PATH         "$HOME/conf/bd/common/clj/secret/clj-infrastructure.config.secret.edn"
+    $ export CLJ_INFRA_CONFIG_PATH "$HOME/conf/bd/common/clj/secret/clj-infrastructure.config.secret.edn"
 
 ## Coordinates
 
