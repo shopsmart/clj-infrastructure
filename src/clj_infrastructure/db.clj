@@ -13,7 +13,7 @@
   Query execution functions may also specify a timeout value so that
   hung JDBC connections do not indefinitely hang the thread."
   (:require [clojure.tools.logging :as log]
-            [clojure.string :as str]
+            [clojure.string :as string]
             [clojure.test :refer [is]]
             [clojure.java.jdbc :as db]
             [schema.core :as s :refer [=> =>* defschema Any Str]]
@@ -78,7 +78,7 @@
   [e :- Throwable]
   (let [ex-str                   (d/replace-nil (str e) "")
         fatal-exception-messages (dbconfig {} :fatal-exceptions)]
-    (reduce (fn [fatal ex-str-substring] (if (str/includes? ex-str ex-str-substring) (reduced true))) false fatal-exception-messages)))
+    (reduce (fn [fatal ex-str-substring] (if (string/includes? ex-str ex-str-substring) (reduced true))) false fatal-exception-messages)))
 
 
 (s/defn any-fatal-exceptions? :- s/Bool
@@ -91,22 +91,6 @@
 
 
 ;; Configuration -----------------------------------------------------------------------------
-
-(def dbconfig-defaults
-  "Default values used by the db library go here."
-  {
-   :fatal-exceptions ["Serializable isolation violation on table"
-                      "current transaction is aborted, commands ignored until end of transaction block"
-                      "only table or database owner can vacuum it"
-                      "only table or database owner can analyze it"
-                      "org.postgresql.util.PSQLException"]
-   :max-retries 5
-   :jdbc-timeout-millis (millis/<-minutes 30)
-   :retry-pause-millis (millis/<-seconds 5)
-   :db-spec nothing
-   :connection nothing
-   :sql-fn nothing
-   :abort?-fn nothing})
 
 
 (def JDBC-TIMEOUT-MILLIS
@@ -181,14 +165,22 @@
   (keyword (.toLowerCase (name k))))
 
 
-(def ^:private dbconfig-overrides
-  "API for overridding values in the dbconfig-defaults map.  By default :job-name is defined
-  to be the initial line of SQL and :abort?-fn==any-fatal-exceptions? .
-
-  Clients can override values using dbconfig-override."
-  (atom {:job-name  #(first (template/lines %))
-         :abort?-fn any-fatal-exceptions?
-         :sql-fn    nothing}))          ; Must be overridden later on
+(def ^:private dbconfig-settings
+  "Define default db configuration map.  Clients can override values using dbconfig-override or with-dbconfig-overrides macro"
+  (atom {:job-name            #(first (template/lines %))
+         :abort?-fn           any-fatal-exceptions?
+         :fatal-exceptions    ["Serializable isolation violation on table"
+                               "current transaction is aborted, commands ignored until end of transaction block"
+                               "only table or database owner can vacuum it"
+                               "only table or database owner can analyze it"
+                               "org.postgresql.util.PSQLException"]
+         :max-retries         5
+         :jdbc-timeout-millis (millis/<-minutes 30)
+         :retry-pause-millis  (millis/<-seconds 5)
+         ; Must be overridden later on:
+         :sql-fn              nothing
+         :db-spec             nothing
+         :connection          nothing }))
 
 
 (defn dbconfig
@@ -196,7 +188,7 @@
   [override-map & keys]
   (let [config-keys   (map constant->keyword keys)
         override-map' (into {} (map (f [k v] => [(constant->keyword k) v]) override-map))
-        config-values (merge dbconfig-defaults @dbconfig-overrides override-map')]
+        config-values (merge @dbconfig-settings override-map')]
     (apply read-config config-values config-keys)))
 
 
@@ -211,7 +203,7 @@
   [& kvs]
   (err/not-nil "kvs cannot be nil" kvs)
   (let [overrides (apply assoc {} (mapcat kvs->kv-pairs (partition 2 kvs)))]
-    (swap! dbconfig-overrides #(merge % overrides))))
+    (swap! dbconfig-settings #(merge % overrides))))
 
 
 
@@ -235,7 +227,7 @@
 
   (->> kvs
        (partition 2)
-       (into (vec @dbconfig-overrides))
+       (into (vec @dbconfig-settings))
        (reduce
         (fn [result [k v]]
           (let [setting-namespace (db-setting? k)]
@@ -251,25 +243,25 @@
 
 (defn with-overrides
  "Save the current database library overrides.  When exiting scope, restore all of the prior
- dbconfig-overrides."
+ dbconfig-settings"
   [f & args]
-  (let [old-overrides @dbconfig-overrides]
+  (let [old-overrides @dbconfig-settings]
     (try
       (apply f args)
       (finally
-        (reset! dbconfig-overrides old-overrides)))))
+        (reset! dbconfig-settings old-overrides)))))
 
 
 (defmacro with-dbconfig-overrides
  "Save the current database library overrides.  When exiting scope, restore all of the prior
- dbconfig-overrides."
+ dbconfig-settings."
  [& body]
  `(with-overrides (fn [] ~@body)))
 
 
 (defmacro dbconfig-connection
   "Create a DYNAMIC scope binding to a new database connection identified by spec within the
-  dbconfig-overrides and executes body within that scope.  Saves the state of dbconfig-overrides
+  dbconfig-settings and executes body within that scope.  Saves the state of dbconfig-settings
   at the beginning and restores them at the end."
   [spec & body]
   `(with-dbconfig-overrides
@@ -280,8 +272,8 @@
 
 
 (defmacro dbconfig-transaction
-  "Create a DYNAMIC scope binding to a new transaction identified by spec within the dbconfig-overrides
-  and executes body within that scope.  Saves the state of dbconfig-overrides at the beginning and restores
+  "Create a DYNAMIC scope binding to a new transaction identified by spec within the dbconfig-settings
+  and executes body within that scope.  Saves the state of dbconfig-settings at the beginning and restores
   them at the end."
   [spec & body]
   `(with-dbconfig-overrides
@@ -301,7 +293,7 @@
                       [#"token=[^']+", "token=XXX"]]]
 
     (reduce (fn [cur-statement [match replacement]]
-              (str/replace cur-statement match replacement))
+              (string/replace cur-statement match replacement))
             statement
             replacements)))
 
@@ -571,7 +563,7 @@
 
 
 (defn- row->kv-pair [result-row key-columns]
-  [(str "'" (str/join "' && '" (mapcat (fn [col] [(str (name col) "'->'" (col result-row))]) key-columns)) "'") result-row])
+  [(str "'" (string/join "' && '" (mapcat (fn [col] [(str (name col) "'->'" (col result-row))]) key-columns)) "'") result-row])
 
 
 (defn- add-row-to-result-map [key-columns result row]
@@ -657,7 +649,7 @@
   conditions usable in a sql query to retrieve any row again that utilizes the same
   key columns/values."
   [key-string]
-  (let [key-string-parts (str/split key-string #"^'|' && '|'->'|'$")
+  (let [key-string-parts (string/split key-string #"^'|' && '|'->'|'$")
         col-value-pairs (partition 2 (rest key-string-parts))
         where-conditions (map (fn [[col value]] (str col "='" value "'")) col-value-pairs)]
-    (str/join " and " where-conditions)))
+    (string/join " and " where-conditions)))
