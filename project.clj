@@ -19,8 +19,14 @@
 
   :jvm-opts ["-Xmx10g" "-Xms512m" "-XX:+UseParallelGC"]
 
-  :dependencies [[org.clojure/clojure "1.8.0"]
-                 [org.clojure/tools.logging "0.3.1"]
-                 [prismatic/schema "1.1.1"]
-                 [org.clojure/java.jdbc "0.6.2-alpha2"]
-                 [com.github.shopsmart/clj-foundation "0.9.22"]])
+  :dependencies [[org.clojure/clojure                 "1.8.0"]
+                 [org.clojure/tools.logging           "0.3.1"]
+                 [prismatic/schema                    "1.1.1"]
+                 [org.clojure/java.jdbc               "0.6.2-alpha2"]
+                 [com.github.shopsmart/clj-foundation "0.9.22"]
+                 [cheshire                            "5.6.3"]  ; JSON processing
+                 [com.cemerick/url                    "0.1.1"]  ; URL construction
+                 [digest                              "1.4.5"]  ; Hashing functions
+                 [clj-time                            "0.12.0"] ; Joda time wrapper
+                 [sudharsh/clj-oauth2                 "0.5.3"]  ; Oauth2 lib with clj-http wrappers 
+])

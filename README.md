@@ -11,6 +11,17 @@
   * Utilities to interact with EC2 instances
   * s3 up/download
 
+* Dropbox
+ * API v1 wrappers
+
+## Config setup
+
+Export environment variable(s) (or set on command line) for EDN format configuration file location.
+
+Set environment variable to override default configuration file location:
+
+    $ export LIB_CLJ_INFRA_CONFIG_FILE_PATH         "$HOME/conf/bd/common/clj/secret/clj-infrastructure.config.secret.edn"
+
 ## Coordinates
 
 ```clojure
