@@ -13,7 +13,7 @@
   Query execution functions may also specify a timeout value so that
   hung JDBC connections do not indefinitely hang the thread."
   (:require [clojure.tools.logging :as log]
-            [clojure.string :as str]
+            [clojure.string :as string]
             [clojure.test :refer [is]]
             [clojure.java.jdbc :as db]
             [schema.core :as s :refer [=> =>* defschema Any Str]]
@@ -78,7 +78,7 @@
   [e :- Throwable]
   (let [ex-str                   (d/replace-nil (str e) "")
         fatal-exception-messages (dbconfig {} :fatal-exceptions)]
-    (reduce (fn [fatal ex-str-substring] (if (str/includes? ex-str ex-str-substring) (reduced true))) false fatal-exception-messages)))
+    (reduce (fn [fatal ex-str-substring] (if (string/includes? ex-str ex-str-substring) (reduced true))) false fatal-exception-messages)))
 
 
 (s/defn any-fatal-exceptions? :- s/Bool
@@ -293,7 +293,7 @@
                       [#"token=[^']+", "token=XXX"]]]
 
     (reduce (fn [cur-statement [match replacement]]
-              (str/replace cur-statement match replacement))
+              (string/replace cur-statement match replacement))
             statement
             replacements)))
 
@@ -563,7 +563,7 @@
 
 
 (defn- row->kv-pair [result-row key-columns]
-  [(str "'" (str/join "' && '" (mapcat (fn [col] [(str (name col) "'->'" (col result-row))]) key-columns)) "'") result-row])
+  [(str "'" (string/join "' && '" (mapcat (fn [col] [(str (name col) "'->'" (col result-row))]) key-columns)) "'") result-row])
 
 
 (defn- add-row-to-result-map [key-columns result row]
@@ -649,7 +649,7 @@
   conditions usable in a sql query to retrieve any row again that utilizes the same
   key columns/values."
   [key-string]
-  (let [key-string-parts (str/split key-string #"^'|' && '|'->'|'$")
+  (let [key-string-parts (string/split key-string #"^'|' && '|'->'|'$")
         col-value-pairs (partition 2 (rest key-string-parts))
         where-conditions (map (fn [[col value]] (str col "='" value "'")) col-value-pairs)]
-    (str/join " and " where-conditions)))
+    (string/join " and " where-conditions)))
