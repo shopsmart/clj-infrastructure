@@ -8,9 +8,9 @@
     [clojure.string           :as string]
 
     ; 3rd party libs
-    [cemerick.url       :as url]
-    [cheshire.core      :as json]
-    [clj-oauth2.client  :as oauth2]
+    [cemerick.url             :as url]
+    [cheshire.core            :as json]
+    [clj-http.client          :as http]
   )
   (:gen-class))
 
@@ -141,7 +141,8 @@
 
 
 (defn access-token->oauth2-opt
-  "Prepare a oauth2 access token as an HTTP option"
+  "Prepare a oauth2 access token as an HTTP option (specific to oauth lib)
+   @deprecated"
   [access-token]
   {:oauth2
     {:access-token  access-token
@@ -187,9 +188,9 @@
           url           (str (:url api-meta-map) (when url-suffix (url/url-encode url-suffix)))]
       (case (string/lower-case (:method api-meta-map))
         "get"
-          (oauth2/get   url (merge http-opt-map (access-token->oauth2-opt access-token)))
+          (http/get url (merge http-opt-map {:oauth-token access-token}))
         "post"
-          (oauth2/post  url (merge http-opt-map (access-token->oauth2-opt access-token)))))))
+          (http/put url (merge http-opt-map {:oauth-token access-token}))))))
 
 
 (defn dbox-file->file-stream

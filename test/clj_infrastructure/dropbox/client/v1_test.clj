@@ -11,9 +11,9 @@
     [clj-infrastructure.dropbox.client.v1 :as dbox]
 
     ; 3rd party libs
-    [cemerick.url       :as url]
-    [cheshire.core      :as json]
-    [clj-oauth2.client  :as oauth2]
+    [cemerick.url                         :as url]
+    [cheshire.core                        :as json]
+    [clj-http.client                      :as http]
   )
   (:gen-class))
 
