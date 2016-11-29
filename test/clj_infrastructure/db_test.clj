@@ -644,4 +644,4 @@
                  (is (not (empty? (jdbc/query conn2 [(q "select * from ${test-table}")]))))))))))))
 
 
-(run-tests)
+#_(run-tests)
