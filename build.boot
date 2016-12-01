@@ -1,17 +1,18 @@
-(def project  'bradsdeals/clj-infrastructure)
-(def version  "0.1.17")
-(def project-name "clj-infrastructure")
-(def project-openness :open-source)
+(def task-options
+  {:project  'bradsdeals/clj-infrastructure
+   :version  "0.1.17"
+   :project-name "clj-infrastructure"
+   :project-openness :open-source
 
-(def description "Infrastructure helpers for AWS, database, etc.")
-(def scm-url "https://github.com/shopsmart/clj-infrastructure")
+   :description "Infrastructure helpers for AWS, database, etc."
+   :scm-url "https://github.com/shopsmart/clj-infrastructure"
+
+   :test-sources "test"
+   :test-resources nil})
 
 
 (set-env! :resource-paths #{"resources"}
-          :source-paths   #{"src" "test"}
-          :repositories #(conj % ["clojars-push" {:url "https://clojars.org/repo/"
-                                                  :username (System/getenv "CLOJARS_USER")
-                                                  :password (System/getenv "CLOJARS_PASS")}])
+          :source-paths   #{"src"}
 
           :dependencies   '[[org.clojure/clojure   "1.8.0"]
                             [clojure-future-spec   "1.9.0-alpha14"]
@@ -30,4 +31,4 @@
 
 (require '[clj-boot.core :refer :all])
 
-(set-task-options! project project-name project-openness description version scm-url)
+(set-task-options! task-options)
