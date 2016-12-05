@@ -1,4 +1,4 @@
-(defproject com.github.shopsmart/clj-infrastructure "0.1.14"
+(defproject com.github.shopsmart/clj-infrastructure "0.1.20"
   :description "Infrastructure helpers for AWS, database, etc."
   :url "https://github.com/shopsmart/clj-infrastructure"
 
@@ -12,15 +12,12 @@
 
   :repositories [["jitpack" "https://jitpack.io"]]
 
-  :profiles {:test {:dependencies [[com.h2database/h2 "1.4.192"]
-                                   [postgresql/postgresql "9.3-1102.jdbc41"]]}
-             :repl {:dependencies [[com.h2database/h2 "1.4.192"]
-                                   [postgresql/postgresql "9.3-1102.jdbc41"]]}}
-
   :jvm-opts ["-Xmx10g" "-Xms512m" "-XX:+UseParallelGC"]
 
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/tools.logging "0.3.1"]
                  [prismatic/schema "1.1.1"]
-                 [org.clojure/java.jdbc "0.6.2-alpha2"]
+                 [org.clojure/java.jdbc "0.7.0-alpha1"]
+                 [com.h2database/h2 "1.4.192"]
+                 [org.postgresql/postgresql "9.4.1212"]
                  [com.github.shopsmart/clj-foundation "0.9.22"]])
