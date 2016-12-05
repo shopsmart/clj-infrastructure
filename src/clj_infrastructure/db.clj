@@ -126,7 +126,7 @@
 (def CONNECTION
   "A constant for specifying the database connection to use for the operation.  This is the result of
   applying get-connection or with-db-connection to a DB-SPEC."
-  ::CONNECTION)
+  :connection)
 
 
 (def SQL-FN
@@ -165,22 +165,24 @@
   (keyword (.toLowerCase (name k))))
 
 
-(def ^:private dbconfig-settings
+(def db-setting-defaults
   "Define default db configuration map.  Clients can override values using dbconfig-override or with-dbconfig-overrides macro"
-  (atom {:job-name            #(first (template/lines %))
-         :abort?-fn           any-fatal-exceptions?
-         :fatal-exceptions    ["Serializable isolation violation on table"
-                               "current transaction is aborted, commands ignored until end of transaction block"
-                               "only table or database owner can vacuum it"
-                               "only table or database owner can analyze it"
-                               "org.postgresql.util.PSQLException"]
-         :max-retries         5
-         :jdbc-timeout-millis (millis/<-minutes 30)
-         :retry-pause-millis  (millis/<-seconds 5)
-         ; Must be overridden later on:
-         :sql-fn              nothing
-         :db-spec             nothing
-         :connection          nothing }))
+  {:job-name            #(first (template/lines %))
+   :abort?-fn           any-fatal-exceptions?
+   :fatal-exceptions    ["Serializable isolation violation on table"
+                         "current transaction is aborted, commands ignored until end of transaction block"
+                         "only table or database owner can vacuum it"
+                         "only table or database owner can analyze it"
+                         "org.postgresql.util.PSQLException"]
+   :max-retries         5
+   :jdbc-timeout-millis (millis/<-minutes 30)
+   :retry-pause-millis  (millis/<-seconds 5)
+
+   ; Must be overridden later on:
+   :sql-fn              nothing
+   :db-spec             nothing
+   ;:connection          nothing
+})
 
 
 (defn dbconfig
@@ -188,7 +190,7 @@
   [override-map & keys]
   (let [config-keys   (map constant->keyword keys)
         override-map' (into {} (map (f [k v] => [(constant->keyword k) v]) override-map))
-        config-values (merge @dbconfig-settings override-map')]
+        config-values (merge db-setting-defaults override-map')]
     (apply read-config config-values config-keys)))
 
 
@@ -197,13 +199,15 @@
   [(constant->keyword k) v])
 
 
+(comment
 (defn dbconfig-override
   "Override or set dbconfig values for this session.  dbconfig keys (above) must identify the config
   constant to change."
   [& kvs]
   (err/not-nil "kvs cannot be nil" kvs)
   (let [overrides (apply assoc {} (mapcat kvs->kv-pairs (partition 2 kvs)))]
-    (swap! dbconfig-settings #(merge % overrides))))
+    (swap! db-setting-defaults #(merge % overrides))))
+)
 
 
 
@@ -227,7 +231,7 @@
 
   (->> kvs
        (partition 2)
-       (into (vec @dbconfig-settings))
+       (into (vec db-setting-defaults))
        (reduce
         (fn [result [k v]]
           (let [setting-namespace (db-setting? k)]
@@ -241,27 +245,28 @@
 ;; Connection and transaction management ---------------------------------------------------
 
 
+(comment
 (defn with-overrides
  "Save the current database library overrides.  When exiting scope, restore all of the prior
- dbconfig-settings"
+ db-setting-defaults"
   [f & args]
-  (let [old-overrides @dbconfig-settings]
+  (let [old-overrides @db-setting-defaults]
     (try
       (apply f args)
       (finally
-        (reset! dbconfig-settings old-overrides)))))
+        (reset! db-setting-defaults old-overrides)))))
 
 
 (defmacro with-dbconfig-overrides
  "Save the current database library overrides.  When exiting scope, restore all of the prior
- dbconfig-settings."
+ db-setting-defaults."
  [& body]
  `(with-overrides (fn [] ~@body)))
 
 
 (defmacro dbconfig-connection
   "Create a DYNAMIC scope binding to a new database connection identified by spec within the
-  dbconfig-settings and executes body within that scope.  Saves the state of dbconfig-settings
+  db-setting-defaults and executes body within that scope.  Saves the state of db-setting-defaults
   at the beginning and restores them at the end."
   [spec & body]
   `(with-dbconfig-overrides
@@ -272,8 +277,8 @@
 
 
 (defmacro dbconfig-transaction
-  "Create a DYNAMIC scope binding to a new transaction identified by spec within the dbconfig-settings
-  and executes body within that scope.  Saves the state of dbconfig-settings at the beginning and restores
+  "Create a DYNAMIC scope binding to a new transaction identified by spec within the db-setting-defaults
+  and executes body within that scope.  Saves the state of db-setting-defaults at the beginning and restores
   them at the end."
   [spec & body]
   `(with-dbconfig-overrides
@@ -281,6 +286,7 @@
       (dbconfig-override ~DB-SPEC ~spec)
       (dbconfig-override ~CONNECTION new-conn#)
       ~@body)))
+)
 
 
 ;; SQL Logging -----------------------------------------------------------------------------
@@ -371,7 +377,8 @@
   That function returns the results of calling:
   (sql-fn connection [prepared-statement bind-arg1 bind-arg2 ... bind-argn] {dblib-params})"
 
-  [sql-template :- s/Str
+  [connection
+   sql-template :- s/Str
    & kvs        :- [s/Keyword s/Any]]
 
   (errors/must-be "Expecting an even number of kv parameters" (even? (count kvs)))
@@ -383,8 +390,8 @@
 
         config               (partial dbconfig settings)
 
-        connection           (config CONNECTION)
-        _                    (err/must-be "CONNECTION must be defined." (something? connection))
+        ;connection           (config CONNECTION)
+        ;                     (err/must-be "CONNECTION must be defined." (something? connection))
 
         [sql
          sql-argument-names] (template/sql-vars (apply resolve-sql sql-template (template/kv-vector<- template-vars)))
@@ -449,9 +456,9 @@
   [function-name sql-or-resource & constant-kvs]
   (let [job-name (name function-name)]
     `(def ~function-name
-       (fn [& runtime-kvs#]
+       (fn [conn# & runtime-kvs#]
          (let [kvs# (apply conj [~@constant-kvs] runtime-kvs#)
-               q# (apply prepare ~sql-or-resource JOB-NAME ~job-name SQL-FN clojure.java.jdbc/query kvs#)]
+               q# (apply prepare conn# ~sql-or-resource JOB-NAME ~job-name SQL-FN clojure.java.jdbc/query kvs#)]
            (q#))))))
 
 
@@ -469,9 +476,9 @@
   [function-name sql-or-resource & constant-kvs]
   (let [job-name (name function-name)]
     `(def ~function-name
-       (fn [& runtime-kvs#]
+       (fn [conn# & runtime-kvs#]
          (let [kvs# (apply conj [~@constant-kvs] runtime-kvs#)
-               q# (apply prepare ~sql-or-resource JOB-NAME ~job-name SQL-FN clojure.java.jdbc/execute! kvs#)]
+               q# (apply prepare conn# ~sql-or-resource JOB-NAME ~job-name SQL-FN clojure.java.jdbc/execute! kvs#)]
            (q#))))))
 
 
@@ -479,8 +486,8 @@
   "Execute on CONNECTION the specified SQL or the SQL in the specified
   resource file, substituting the subsequent key-value pairs for the
   variables defined in the resource file."
-  [sql-or-resource & variable-key-vals]
-  (let [sql-fn (apply prepare sql-or-resource SQL-FN clojure.java.jdbc/execute! variable-key-vals)]
+  [conn sql-or-resource & variable-key-vals]
+  (let [sql-fn (apply prepare conn sql-or-resource SQL-FN clojure.java.jdbc/execute! variable-key-vals)]
     (sql-fn)))
 
 
@@ -488,8 +495,8 @@
   "Query CONNECTION using the specified SQL or the SQL in the specified
   resource file, substituting the subsequent key-value pairs for the
   variables defined in the resource file."
-  [sql-or-resource & variable-key-vals]
-  (let [sql-fn (apply prepare sql-or-resource SQL-FN clojure.java.jdbc/query variable-key-vals)]
+  [conn sql-or-resource & variable-key-vals]
+  (let [sql-fn (apply prepare conn sql-or-resource SQL-FN clojure.java.jdbc/query variable-key-vals)]
     (sql-fn)))
 
 
@@ -604,7 +611,7 @@
   If the key vector does not uniquely identify a row in the result set,
   keys identifying multiple rows will be associated with a vector
   containing the rows referenced by the key."
-  [sql-or-resource & keys-or-variable-key-vals]
+  [conn sql-or-resource & keys-or-variable-key-vals]
   (let [[key-columns variable-key-vals] (extract-keys keys-or-variable-key-vals nil)
         query (apply prepare sql-or-resource SQL-FN query variable-key-vals)]
 
@@ -624,8 +631,8 @@
   The remaining parameters must be key-value pairs specifying substitution
   variable values for any variables defined in the SQL code or the SQL
   resource file."
-  [sql-or-resource & keys-or-variable-key-vals]
-  (let [keyed-query (apply keyed-query-fn sql-or-resource keys-or-variable-key-vals)]
+  [conn sql-or-resource & keys-or-variable-key-vals]
+  (let [keyed-query (apply keyed-query-fn conn sql-or-resource keys-or-variable-key-vals)]
     (keyed-query)))
 
 
@@ -640,8 +647,8 @@
   If the key vector does not uniquely identify a row in the result set,
   keys identifying multiple rows will be associated with a vector
   containing the rows referenced by the key."
-  [function-name sql-or-resource & default-subs]
-  `(def ~function-name (keyed-query-fn ~sql-or-resource ~@default-subs)))
+  [conn function-name sql-or-resource & default-subs]
+  `(def ~function-name (keyed-query-fn conn ~sql-or-resource ~@default-subs)))
 
 
 (defn keystring->where-conditions
