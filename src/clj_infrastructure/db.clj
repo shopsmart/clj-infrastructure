@@ -656,10 +656,18 @@
         where-conditions (map (fn [[col value]] (str col "='" value "'")) col-value-pairs)]
     (string/join " and " where-conditions)))
 
-(defn split-statements
-  [sql-text]
-  (let [statements (clojure.string/split sql-text #";")]
-    statements))
+
+(defn sql->stmt-detail-map [stmt-text & {:keys [exec-mode commit? binds opt-map op-comment] :as detail-kw}]
+  (let [detail-map
+    (merge
+        {:stmt-text stmt-text
+         :op-comment op-comment
+         :exec-mode (or exec-mode dbc/DB_EXEC_MODE_QUERY)}
+        (when binds {:binds binds})
+        (when commit? {:commit? commit?})
+        (when opt-map {:opt-map opt-map}))]
+     detail-map))
+
 
 (defn run-sql-stmts-in-transaction
     [conn-or-spec stmt-detail-vec & set-session-stmt-vec]
@@ -678,7 +686,7 @@
             :op-comment \"Encourage index usage\"
             :binds      nil
             :opt-map    {:as-arrays? true}
-            :commit     false}
+            :commit?    false}
           { :stmt-text  \"select 1\"
             :exec-mode  DB_EXEC_MODE_QUERY
             :op-comment \"Extract new or modified user details\" }  ]
@@ -689,6 +697,7 @@
         (doall
           (for [stmt-detail-map stmt-detail-vec]
             (run-statement conn stmt-detail-map))))))
+
 
 (defn run-statement
   [conn {:keys [stmt-text exec-mode op-comment binds opt-map commit?] :as stmt-detail-map}]
@@ -718,4 +727,3 @@
       (when commit?
         (.commit (:connection conn)))
       updated-map)))
-
