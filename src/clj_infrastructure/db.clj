@@ -29,6 +29,8 @@
   (:import [java.sql PreparedStatement SQLException])
   (:gen-class))
 
+(def DB_EXEC_MODE_QUERY "query")
+(def DB_EXEC_MODE_EXEC  "execute")
 
 ;; Error handling ----------------------------------------------------------------------------
 
@@ -174,8 +176,8 @@
                                "only table or database owner can vacuum it"
                                "only table or database owner can analyze it"
                                "org.postgresql.util.PSQLException"]
-         :max-retries         5
-         :jdbc-timeout-millis (millis/<-minutes 30)
+         :max-retries         0
+         :jdbc-timeout-millis (millis/<-minutes (* 60 24))
          :retry-pause-millis  (millis/<-seconds 5)
          ; Must be overridden later on:
          :sql-fn              nothing
@@ -653,3 +655,67 @@
         col-value-pairs (partition 2 (rest key-string-parts))
         where-conditions (map (fn [[col value]] (str col "='" value "'")) col-value-pairs)]
     (string/join " and " where-conditions)))
+
+(defn split-statements
+  [sql-text]
+  (let [statements (clojure.string/split sql-text #";")]
+    statements))
+
+(defn run-sql-stmts-in-transaction
+    [conn-or-spec stmt-detail-vec & set-session-stmt-vec]
+
+    """
+    Runs the provided set of queries with the specified options.
+
+    sql-vec A vector of maps containing statement details.  A statement detail map
+            contains details such as sql text, execution mode, options, etc.
+
+        e.g.
+
+        [
+          { :stmt-text  \"set random_page_cost = 1\"
+            :exec-mode  DB_EXEC_MODE_EXEC
+            :op-comment \"Encourage index usage\"
+            :binds      nil
+            :opt-map    {:as-arrays? true}
+            :commit     false}
+          { :stmt-text  \"select 1\"
+            :exec-mode  DB_EXEC_MODE_QUERY
+            :op-comment \"Extract new or modified user details\" }  ]
+    """
+
+    (dbc/dbconfig-connection conn-or-spec
+      (jdbc/with-db-transaction [conn (dbc/dbconfig {} "connection")]
+        (doall
+          (for [stmt-detail-map stmt-detail-vec]
+            (run-statement conn stmt-detail-map))))))
+
+(defn run-statement
+  [conn {:keys [stmt-text exec-mode op-comment binds opt-map commit?] :as stmt-detail-map}]
+
+  """
+  Runs the statement represented by the supplied statement detail
+  map.
+
+  Returns: The statement detail map updated with {:result result-data}
+  """
+
+  (log/info (str "Running statement: [" stmt-text "] ..."))
+  (let [sql-params (concat [stmt-text] binds)]
+    (when op-comment
+      (log/info (str "Operation comment: " op-comment)))
+    (let [updated-map
+      (assoc-in stmt-detail-map [:result]
+        (cond
+          (= exec-mode DB_EXEC_MODE_QUERY)
+            (do
+              (log/debug "Issuing statement as query (results expected) ...")
+              (jdbc/query conn sql-params opt-map))
+          (= exec-mode DB_EXEC_MODE_EXEC)
+            (do 
+              (log/debug "Issuing statement as execution (no results expected) ...")
+              (jdbc/execute! conn sql-params opt-map))))]
+      (when commit?
+        (.commit (:connection conn)))
+      updated-map)))
+
