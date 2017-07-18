@@ -670,7 +670,7 @@
 
 
 (defn run-sql-stmts-in-transaction
-    [conn-or-spec stmt-detail-vec & set-session-stmt-vec]
+    [conn-or-spec stmt-detail-vec]
 
     """
     Runs the provided set of queries with the specified options.
