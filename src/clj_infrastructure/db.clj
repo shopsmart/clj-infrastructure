@@ -693,7 +693,8 @@
     """
 
     (dbconfig-connection conn-or-spec
-      (jdbc/with-db-transaction [conn (dbconfig {} "connection")]
+      (clojure.java.jdbc/with-db-transaction [conn (dbconfig {} "connection")]
+
         (doall
           (for [stmt-detail-map stmt-detail-vec]
             (run-statement conn stmt-detail-map))))))
@@ -719,11 +720,11 @@
           (= exec-mode DB_EXEC_MODE_QUERY)
             (do
               (log/debug "Issuing statement as query (results expected) ...")
-              (jdbc/query conn sql-params opt-map))
+              (clojure.java.jdbc/query conn sql-params opt-map))
           (= exec-mode DB_EXEC_MODE_EXEC)
             (do 
               (log/debug "Issuing statement as execution (no results expected) ...")
-              (jdbc/execute! conn sql-params opt-map))))]
+              (clojure.java.jdbc/execute! conn sql-params opt-map))))]
       (when commit?
         (.commit (:connection conn)))
       updated-map)))
