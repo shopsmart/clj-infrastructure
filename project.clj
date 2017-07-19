@@ -1,4 +1,4 @@
-(defproject com.github.shopsmart/clj-infrastructure "0.1.16"
+(defproject com.github.shopsmart/clj-infrastructure "0.1.17"
   :description "Infrastructure helpers for AWS, database, etc."
   :url "https://github.com/shopsmart/clj-infrastructure"
 
