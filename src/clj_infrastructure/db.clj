@@ -662,7 +662,7 @@
     (merge
         {:stmt-text stmt-text
          :op-comment op-comment
-         :exec-mode (or exec-mode dbc/DB_EXEC_MODE_QUERY)}
+         :exec-mode (or exec-mode DB_EXEC_MODE_QUERY)}
         (when binds {:binds binds})
         (when commit? {:commit? commit?})
         (when opt-map {:opt-map opt-map}))]
@@ -692,8 +692,8 @@
             :op-comment \"Extract new or modified user details\" }  ]
     """
 
-    (dbc/dbconfig-connection conn-or-spec
-      (jdbc/with-db-transaction [conn (dbc/dbconfig {} "connection")]
+    (dbconfig-connection conn-or-spec
+      (jdbc/with-db-transaction [conn (dbconfig {} "connection")]
         (doall
           (for [stmt-detail-map stmt-detail-vec]
             (run-statement conn stmt-detail-map))))))
