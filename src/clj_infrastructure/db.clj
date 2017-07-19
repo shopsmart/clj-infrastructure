@@ -669,6 +669,36 @@
      detail-map))
 
 
+(defn run-statement
+  [conn {:keys [stmt-text exec-mode op-comment binds opt-map commit?] :as stmt-detail-map}]
+
+  """
+  Runs the statement represented by the supplied statement detail
+  map.
+
+  Returns: The statement detail map updated with {:result result-data}
+  """
+
+  (log/info (str "Running statement: [" stmt-text "] ..."))
+  (let [sql-params (concat [stmt-text] binds)]
+    (when op-comment
+      (log/info (str "Operation comment: " op-comment)))
+    (let [updated-map
+      (assoc-in stmt-detail-map [:result]
+        (cond
+          (= exec-mode DB_EXEC_MODE_QUERY)
+            (do
+              (log/debug "Issuing statement as query (results expected) ...")
+              (clojure.java.jdbc/query conn sql-params opt-map))
+          (= exec-mode DB_EXEC_MODE_EXEC)
+            (do 
+              (log/debug "Issuing statement as execution (no results expected) ...")
+              (clojure.java.jdbc/execute! conn sql-params opt-map))))]
+      (when commit?
+        (.commit (:connection conn)))
+      updated-map)))
+
+
 (defn run-sql-stmts-in-transaction
     [conn-or-spec stmt-detail-vec]
 
@@ -699,32 +729,3 @@
           (for [stmt-detail-map stmt-detail-vec]
             (run-statement conn stmt-detail-map))))))
 
-
-(defn run-statement
-  [conn {:keys [stmt-text exec-mode op-comment binds opt-map commit?] :as stmt-detail-map}]
-
-  """
-  Runs the statement represented by the supplied statement detail
-  map.
-
-  Returns: The statement detail map updated with {:result result-data}
-  """
-
-  (log/info (str "Running statement: [" stmt-text "] ..."))
-  (let [sql-params (concat [stmt-text] binds)]
-    (when op-comment
-      (log/info (str "Operation comment: " op-comment)))
-    (let [updated-map
-      (assoc-in stmt-detail-map [:result]
-        (cond
-          (= exec-mode DB_EXEC_MODE_QUERY)
-            (do
-              (log/debug "Issuing statement as query (results expected) ...")
-              (clojure.java.jdbc/query conn sql-params opt-map))
-          (= exec-mode DB_EXEC_MODE_EXEC)
-            (do 
-              (log/debug "Issuing statement as execution (no results expected) ...")
-              (clojure.java.jdbc/execute! conn sql-params opt-map))))]
-      (when commit?
-        (.commit (:connection conn)))
-      updated-map)))
