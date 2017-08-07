@@ -29,8 +29,9 @@
   (:import [java.sql PreparedStatement SQLException])
   (:gen-class))
 
-(def DB_EXEC_MODE_QUERY "query")
-(def DB_EXEC_MODE_EXEC  "execute")
+(def DB_EXEC_MODE_QUERY         "query")
+(def DB_EXEC_MODE_QUERY_CURSOR  "query_cursor")
+(def DB_EXEC_MODE_EXEC          "execute")
 
 ;; Error handling ----------------------------------------------------------------------------
 
@@ -669,6 +670,61 @@
      detail-map))
 
 
+(defn sql-cursor->result-set-fn-results [
+  conn
+  [sql & params :as sql-params]
+  result-set-fn &
+  [{:keys [transaction? as-arrays? fetch-size] :as opt-map}]]
+
+  """
+  Runs the provided SQL and passes the result set  cursor to the provided
+  result set function.  Using a cursor allows rows to be fetched in batches
+  (of size (:fetch-size opt-map)), but requires the a function to process
+  results due to the need to manage the transaction and cursor requirements
+  properly (i.e. ensure auto commit is off, that the cursor is closed, etc.)
+
+  The interface works with parameters as expected by other clojure.java.jdbc
+  function.
+
+  TODO: Add handling of :multi? opt key
+  """
+
+  ; Factored out body of function:
+  (let [
+    body-fn
+      (fn fn-body-sql->cursor [
+        conn
+        [sql & params :as sql-params] &
+        [{:keys [transaction? as-arrays? fetch-size] :as opt-map}]]
+
+        (let [fetch-size (or fetch-size 1000)]
+
+          (with-open [
+            cursor 
+              (let [stmt (.prepareStatement (:connection conn) sql)]
+                (doseq [[index value] (map vector (iterate inc 1) params)]
+                  (.setObject stmt index value))
+                (.setFetchSize stmt fetch-size)
+                (.executeQuery stmt))]
+
+              (result-set-fn 
+                (if (true? as-arrays?)
+                  (do (map #(into [] (vals %)) (resultset-seq cursor)))
+                  (do (resultset-seq cursor)))))))]
+
+    ; Run the body optionally wrapped in a transaction 
+    (let [auto-commit-val (.getAutoCommit (:connection conn))]
+      (if (or transaction? auto-commit-val)
+        (do
+          (.setAutoCommit (:connection conn) false)
+          (clojure.java.jdbc/with-db-transaction [conn (dbconfig {} "connection")]
+            (body-fn conn sql-params opt-map))
+          (when (true? auto-commit-val)
+            (.commit (:connection conn))
+            (.setAutoCommit (:connection conn) auto-commit-val)))
+        (do (body-fn conn sql-params opt-map))))))
+
+
 (defn run-statement
   [conn {:keys [stmt-text exec-mode op-comment binds opt-map commit?] :as stmt-detail-map}]
 
@@ -686,7 +742,19 @@
     (let [updated-map
       (assoc-in stmt-detail-map [:result]
         (cond
-          (= exec-mode DB_EXEC_MODE_QUERY)
+          (and (:result-set-fn opt-map) (= exec-mode DB_EXEC_MODE_QUERY_CURSOR))
+            ; Execute query using cursor to fetch results in batches (requires a
+            ; result set function that processes rows)
+            (do
+              (log/debug
+                "Issuing statement as query with cursor and batch "
+                "fetching (results expected) ...")
+              (sql-cursor->result-set-fn-results conn sql-params (:result-set-fn opt-map) opt-map))
+          (or
+            (= exec-mode DB_EXEC_MODE_QUERY)
+            (and (= exec-mode DB_EXEC_MODE_QUERY_CURSOR) (not (:result-set-fn opt-map))))
+            ; Execute a query using clojure query function; all results
+            ; are materialized during the fetch
             (do
               (log/debug "Issuing statement as query (results expected) ...")
               (clojure.java.jdbc/query conn sql-params opt-map))
@@ -728,4 +796,5 @@
         (doall
           (for [stmt-detail-map stmt-detail-vec]
             (run-statement conn stmt-detail-map))))))
+
 
