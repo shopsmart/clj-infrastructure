@@ -1,4 +1,4 @@
-# clj-infrastructure
+# **DEPRECATED** clj-infrastructure
 
 Database utilities for Brad's Deals / Shopsmart projects.  In the future this will include additional
 

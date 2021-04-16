@@ -1,8 +1,8 @@
 repository:
   name: clj-infrastructure
-  description: Infrastructure services for AWS applications
+  description: "**DEPRECATED** Infrastructure services for AWS applications"
   homepage: null
-  topics: ''
+  topics: deprecated,obsolete,archived
   private: false
   has_issues: true
   has_projects: true
