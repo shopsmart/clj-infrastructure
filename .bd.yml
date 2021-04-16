@@ -1,0 +1,6 @@
+name: clj-infrastructure
+team: data
+type: library
+tags:
+  language: clojure
+  dependencies: boot
